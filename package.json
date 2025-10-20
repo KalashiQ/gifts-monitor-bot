@@ -14,6 +14,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "example:db": "ts-node src/examples/database-example.ts",
+    "example:parser": "ts-node src/examples/parser-example.ts",
+    "test:preset": "ts-node src/examples/test-specific-preset.ts",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts"
