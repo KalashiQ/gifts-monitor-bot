@@ -157,70 +157,177 @@ export class PeekTgParser {
   private async fillSearchForm(page: Page, criteria: SearchCriteria): Promise<void> {
     console.log('📝 Заполнение формы поиска...');
 
-    // Поиск поля "Подарок" (Gift)
-    const giftNameSelectors = [
-      'input[placeholder*="подарок" i]',
-      'input[placeholder*="gift" i]',
-      'select[name*="gift" i]',
-      '[data-testid*="gift" i]'
-    ];
 
-    for (const selector of giftNameSelectors) {
-      try {
-        const element = await page.$(selector);
-        if (element) {
-          await element.fill(criteria.gift_name);
-          console.log(`  ✅ Заполнено поле подарка: ${criteria.gift_name}`);
-          break;
-        }
-      } catch (error) {
-        // Продолжаем поиск следующего селектора
-      }
-    }
+    // Заполнение подарка (обязательно)
+    await this.selectDropdownValue(page, 'Подарок', criteria.gift_name, [
+      // Английские селекторы
+      'button:has-text("All gifts")',
+      'button[aria-haspopup="listbox"]:has-text("All gifts")',
+      'button[type="button"]:has-text("All gifts")',
+      'div:has(label:has-text("Gift")) button[type="button"]',
+      'div:has(label:has-text("Gift")) button',
+      // Селекторы по классам из HTML
+      'button[class*="relative"]:has-text("All gifts")',
+      'button[class*="flex"]:has-text("All gifts")',
+      'button[class*="w-full"]:has-text("All gifts")',
+      // Селектор по span внутри кнопки
+      'button:has(span:has-text("All gifts"))'
+    ]);
 
     // Заполнение модели, если указана
     if (criteria.model) {
-      await this.fillOptionalField(page, 'model', criteria.model, [
-        'input[placeholder*="модель" i]',
-        'input[placeholder*="model" i]',
-        'select[name*="model" i]'
+      await this.selectDropdownValue(page, 'Коллекция', criteria.model, [
+        'button:has-text("All models")',
+        'button[aria-haspopup="listbox"]:has-text("All models")',
+        'button[type="button"]:has-text("All models")',
+        'div:has(label:has-text("Model")) button[type="button"]',
+        'div:has(label:has-text("Model")) button',
+        'button[class*="relative"]:has-text("All models")',
+        'button[class*="flex"]:has-text("All models")',
+        'button[class*="w-full"]:has-text("All models")',
+        'button:has(span:has-text("All models"))'
       ]);
     }
 
     // Заполнение фона, если указан
     if (criteria.background) {
-      await this.fillOptionalField(page, 'background', criteria.background, [
-        'input[placeholder*="фон" i]',
-        'input[placeholder*="background" i]',
-        'select[name*="background" i]'
+      await this.selectDropdownValue(page, 'Фон', criteria.background, [
+        'button:has-text("All backgrounds")',
+        'button[aria-haspopup="listbox"]:has-text("All backgrounds")',
+        'button[type="button"]:has-text("All backgrounds")',
+        'div:has(label:has-text("Background")) button[type="button"]',
+        'div:has(label:has-text("Background")) button',
+        'button[class*="relative"]:has-text("All backgrounds")',
+        'button[class*="flex"]:has-text("All backgrounds")',
+        'button[class*="w-full"]:has-text("All backgrounds")',
+        'button:has(span:has-text("All backgrounds"))'
       ]);
     }
 
     // Заполнение узора, если указан
     if (criteria.pattern) {
-      await this.fillOptionalField(page, 'pattern', criteria.pattern, [
-        'input[placeholder*="узор" i]',
-        'input[placeholder*="pattern" i]',
-        'select[name*="pattern" i]'
+      await this.selectDropdownValue(page, 'Узор', criteria.pattern, [
+        'button:has-text("All patterns")',
+        'button[aria-haspopup="listbox"]:has-text("All patterns")',
+        'button[type="button"]:has-text("All patterns")',
+        'div:has(label:has-text("Pattern")) button[type="button"]',
+        'div:has(label:has-text("Pattern")) button',
+        'button[class*="relative"]:has-text("All patterns")',
+        'button[class*="flex"]:has-text("All patterns")',
+        'button[class*="w-full"]:has-text("All patterns")',
+        'button:has(span:has-text("All patterns"))'
       ]);
     }
   }
 
-  private async fillOptionalField(page: Page, fieldName: string, value: string, selectors: string[]): Promise<void> {
-    for (const selector of selectors) {
+  private async selectDropdownValue(page: Page, fieldName: string, value: string, buttonSelectors: string[]): Promise<void> {
+    console.log(`  🔍 Выбор ${fieldName}: ${value}`);
+    
+    // Находим и кликаем на кнопку dropdown
+    let dropdownButton = null;
+    for (const selector of buttonSelectors) {
       try {
-        const element = await page.$(selector);
-        if (element) {
-          await element.fill(value);
-          console.log(`  ✅ Заполнено поле ${fieldName}: ${value}`);
-          return;
+        dropdownButton = await page.$(selector);
+        if (dropdownButton) {
+          console.log(`    ✅ Найдена кнопка ${fieldName}: ${selector}`);
+          break;
         }
       } catch (error) {
-        // Продолжаем поиск следующего селектора
+        // Продолжаем поиск
       }
     }
-    console.log(`  ⚠️ Поле ${fieldName} не найдено, пропускаем`);
+
+    if (!dropdownButton) {
+      console.log(`    ⚠️ Кнопка ${fieldName} не найдена, пропускаем`);
+      return;
+    }
+
+    try {
+      // Кликаем на кнопку dropdown
+      await dropdownButton.click();
+      console.log(`    ✅ Кликнули на кнопку ${fieldName}`);
+      
+      // Ждем появления поля поиска
+      await page.waitForTimeout(1000);
+      
+      // Ищем поле поиска и вводим значение
+      const searchInputSelectors = [
+        'input[placeholder="Search..."]',
+        'input[type="text"][placeholder="Search..."]',
+        'div[role="listbox"] input[placeholder="Search..."]',
+        'input[class*="bg-gray-700"]'
+      ];
+      
+      let searchInput = null;
+      for (const selector of searchInputSelectors) {
+        try {
+          searchInput = await page.$(selector);
+          if (searchInput) {
+            console.log(`    ✅ Найдено поле поиска для ${fieldName} с селектором: ${selector}`);
+            break;
+          }
+        } catch (error) {
+          // Продолжаем поиск
+        }
+      }
+      
+      if (searchInput) {
+        console.log(`    ✅ Найдено поле поиска для ${fieldName}`);
+        await searchInput.fill(value);
+        console.log(`    ✅ Введено значение: ${value}`);
+        
+        // Ждем появления результатов поиска
+        await page.waitForTimeout(1500);
+        
+        // Ищем опцию с нужным значением в результатах поиска
+        const optionSelectors = [
+          `[role="option"]:has-text("${value}")`,
+          `div[role="option"]:has-text("${value}")`,
+          `div:has-text("${value}"):has([role="option"])`,
+          `div[class*="cursor-pointer"]:has-text("${value}")`
+        ];
+
+        let optionFound = false;
+        for (const optionSelector of optionSelectors) {
+          try {
+            const option = await page.$(optionSelector);
+            if (option) {
+              await option.click();
+              console.log(`    ✅ Выбрана опция ${fieldName}: ${value}`);
+              optionFound = true;
+              break;
+            }
+          } catch (error) {
+            // Продолжаем поиск
+          }
+        }
+
+        if (!optionFound) {
+          console.log(`    ⚠️ Опция "${value}" не найдена в результатах поиска ${fieldName}`);
+          
+          // Показываем доступные опции для отладки
+          const allOptions = await page.$$('[role="option"], div[class*="cursor-pointer"]');
+          console.log(`    📋 Доступные опции в ${fieldName}:`);
+          for (let i = 0; i < Math.min(allOptions.length, 5); i++) {
+            const text = await allOptions[i].textContent();
+            if (text && text.trim()) {
+              console.log(`      - "${text.trim()}"`);
+            }
+          }
+        }
+      } else {
+        console.log(`    ⚠️ Поле поиска не найдено для ${fieldName}`);
+      }
+
+      // Закрываем dropdown, кликнув вне его
+      await page.click('body');
+      await page.waitForTimeout(500);
+
+    } catch (error) {
+      console.log(`    ❌ Ошибка при выборе ${fieldName}:`, error);
+    }
   }
+
 
   private async clickSearchButton(page: Page): Promise<void> {
     console.log('🔍 Нажатие кнопки поиска...');
@@ -253,8 +360,13 @@ export class PeekTgParser {
   private async waitForResults(page: Page): Promise<void> {
     console.log('⏳ Ожидание результатов поиска...');
 
-    // Ожидание появления результатов
+    // Ожидание появления счетчика результатов
     const resultSelectors = [
+      // Точный селектор для счетчика результатов
+      'span.font-medium.text-white',
+      // Альтернативные селекторы
+      'text=/Найдено:\\s*\\d+/i',
+      'text=/Found:\\s*\\d+/i',
       '[class*="result" i]',
       '[data-testid*="result" i]',
       'text="Найдено"',
@@ -265,8 +377,11 @@ export class PeekTgParser {
 
     for (const selector of resultSelectors) {
       try {
-        await page.waitForSelector(selector, { timeout: 5000 });
-        console.log('  ✅ Результаты загружены');
+        await page.waitForSelector(selector, { timeout: 10000 });
+        console.log(`  ✅ Результаты загружены (селектор: ${selector})`);
+        
+        // Дополнительная пауза для полной загрузки
+        await page.waitForTimeout(1000);
         return;
       } catch (error) {
         // Продолжаем поиск следующего селектора
@@ -280,6 +395,7 @@ export class PeekTgParser {
     console.log('📊 Извлечение результатов поиска...');
 
     try {
+
       // Поиск количества найденных подарков
       const count = await this.extractCount(page);
       
@@ -302,10 +418,50 @@ export class PeekTgParser {
     }
   }
 
+
+
   private async extractCount(page: Page): Promise<number> {
+    console.log('  🔍 Поиск точного счетчика результатов...');
+
+    // Быстрый поиск по конкретному селектору (самый частый случай)
+    try {
+      const element = await page.$('span.font-medium.text-white');
+      if (element) {
+        const text = await element.textContent();
+        if (text) {
+          const match = text.match(/[\d,]+/);
+          if (match) {
+            // Убираем запятые и парсим число
+            const cleanNumber = match[0].replace(/,/g, '');
+            const count = parseInt(cleanNumber, 10);
+            console.log(`  📊 Найдено количество из селектора "span.font-medium.text-white": ${count} (текст: "${text}")`);
+            return count;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('  ⚠️ Не удалось найти span.font-medium.text-white');
+    }
+
+    // Резервный поиск по тексту "Найдено: X"
+    try {
+      const foundText = await page.textContent('text=/Найдено:\\s*[\\d,]+/i');
+      if (foundText) {
+        const match = foundText.match(/Найдено:\s*([\d,]+)/i);
+        if (match) {
+          // Убираем запятые и парсим число
+          const cleanNumber = match[1].replace(/,/g, '');
+          const count = parseInt(cleanNumber, 10);
+          console.log(`  📊 Найдено количество из текста "Найдено: X": ${count}`);
+          return count;
+        }
+      }
+    } catch (error) {
+      console.log('  ⚠️ Не удалось найти текст "Найдено: X"');
+    }
+
+    // Дополнительные селекторы как резерв
     const countSelectors = [
-      'text=/найдено[\\s:]*\\d+/i',
-      'text=/found[\\s:]*\\d+/i',
       '[class*="count" i]',
       '[data-testid*="count" i]'
     ];
@@ -316,9 +472,13 @@ export class PeekTgParser {
         if (element) {
           const text = await element.textContent();
           if (text) {
-            const match = text.match(/\d+/);
+            const match = text.match(/[\d,]+/);
             if (match) {
-              return parseInt(match[0], 10);
+              // Убираем запятые и парсим число
+              const cleanNumber = match[0].replace(/,/g, '');
+              const count = parseInt(cleanNumber, 10);
+              console.log(`  📊 Найдено количество из селектора "${selector}": ${count} (текст: "${text}")`);
+              return count;
             }
           }
         }
@@ -327,17 +487,19 @@ export class PeekTgParser {
       }
     }
 
-    // Если не удалось найти количество, считаем элементы
+    // В крайнем случае считаем элементы карточек подарков
     const itemSelectors = [
-      '[class*="gift" i]',
-      '[class*="item" i]',
-      '[data-testid*="gift" i]'
+      'img[src*="gift"]',
+      'img[alt*="gift" i]',
+      '[class*="gift" i] img',
+      '[class*="item" i] img'
     ];
 
     for (const selector of itemSelectors) {
       try {
         const elements = await page.$$(selector);
-        if (elements.length > 0) {
+        if (elements.length > 0 && elements.length < 100) { // Ограничиваем разумным числом
+          console.log(`  📊 Найдено элементов через селектор "${selector}": ${elements.length}`);
           return elements.length;
         }
       } catch (error) {
@@ -345,6 +507,7 @@ export class PeekTgParser {
       }
     }
 
+    console.log('  ⚠️ Не удалось определить количество подарков');
     return 0;
   }
 
