@@ -39,7 +39,6 @@ export class TelegramBotService {
       this.bot,
       this.sessionManager,
       this.presetModel,
-      this.parserService,
       this.monitoringService
     );
     
@@ -71,11 +70,6 @@ export class TelegramBotService {
       await this.commandHandlers.handleMenu(msg);
     }));
 
-    // Обработчик команды /stats
-    this.bot.onText(/\/stats/, this.accessControl.checkAccess(async (msg) => {
-      await this.commandHandlers.handleStats(msg);
-    }));
-
     // Обработчик команды /monitoring
     this.bot.onText(/\/monitoring/, this.accessControl.checkAccess(async (msg) => {
       await this.commandHandlers.handleMonitoring(msg);
@@ -89,11 +83,6 @@ export class TelegramBotService {
     // Обработчик команды /monitoring_stop
     this.bot.onText(/\/monitoring_stop/, this.accessControl.checkAccess(async (msg) => {
       await this.commandHandlers.handleMonitoringStop(msg);
-    }));
-
-    // Обработчик команды /monitoring_check
-    this.bot.onText(/\/monitoring_check/, this.accessControl.checkAccess(async (msg) => {
-      await this.commandHandlers.handleMonitoringCheck(msg);
     }));
 
     // Обработчик текстовых сообщений
@@ -277,7 +266,6 @@ export class TelegramBotService {
       this.bot,
       this.sessionManager,
       this.presetModel,
-      this.parserService,
       this.monitoringService
     );
     this.callbackHandlers = new CallbackHandlers(

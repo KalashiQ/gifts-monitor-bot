@@ -2,7 +2,6 @@ import TelegramBot from 'node-telegram-bot-api';
 import { SessionManager } from '../session-manager';
 import { UserState } from '../../types/bot';
 import { PresetModel } from '../../database/models/preset.model';
-import { ParserService } from '../../services/parser-service';
 import { MonitoringService } from '../../services/monitoring-service';
 import { MessageFormatter } from '../message-formatter';
 import { InputValidator } from '../validators';
@@ -12,7 +11,6 @@ export class CommandHandlers {
   private bot: TelegramBot;
   private sessionManager: SessionManager;
   private presetModel: PresetModel;
-  private parserService: ParserService;
   private monitoringService?: MonitoringService;
 
   // Вспомогательная функция для преобразования Preset в PresetDisplayData
@@ -31,13 +29,11 @@ export class CommandHandlers {
     bot: TelegramBot,
     sessionManager: SessionManager,
     presetModel: PresetModel,
-    parserService: ParserService,
     monitoringService?: MonitoringService
   ) {
     this.bot = bot;
     this.sessionManager = sessionManager;
     this.presetModel = presetModel;
-    this.parserService = parserService;
     this.monitoringService = monitoringService;
   }
 
@@ -121,23 +117,8 @@ export class CommandHandlers {
       return;
     }
 
-    if (text === '🔍 Проверить сейчас') {
-      await this.handleCheckNow(chatId);
-      return;
-    }
-
-    if (text === '📊 Статистика') {
-      await this.handleStats(msg);
-      return;
-    }
-
     if (text === '🔎 Поиск пресетов') {
       await this.handleSearchPresets(chatId);
-      return;
-    }
-
-    if (text === '⚙️ Настройки') {
-      await this.handleSettings(chatId);
       return;
     }
 
@@ -352,55 +333,6 @@ export class CommandHandlers {
     }
   }
 
-  // Обработчик проверки сейчас
-  private async handleCheckNow(chatId: number): Promise<void> {
-    try {
-      const presets = await this.presetModel.getActiveByUserId(chatId);
-      
-      if (presets.length === 0) {
-        await this.bot.sendMessage(chatId, 
-          '❌ У вас нет активных пресетов для проверки.\n\n' +
-          'Создайте пресет, выбрав "Добавить пресет" в главном меню.',
-          { reply_markup: mainMenu }
-        );
-        return;
-      }
-
-      await this.bot.sendMessage(chatId, 
-        `🔍 Проверяю ${presets.length} пресетов...\n\n⏳ Пожалуйста, подождите...`
-      );
-
-      // Запускаем проверку для каждого пресета
-      for (const preset of presets) {
-        try {
-          const result = await this.parserService.searchGifts({
-            gift_name: preset.gift_name,
-            model: preset.model || undefined,
-            background: preset.background || undefined,
-            pattern: preset.pattern || undefined
-          });
-
-          const resultMessage = MessageFormatter.formatCheckResult(preset, result.count);
-          await this.bot.sendMessage(chatId, resultMessage, {
-            parse_mode: 'HTML'
-          });
-        } catch (error) {
-          console.error(`Error checking preset ${preset.id}:`, error);
-          await this.bot.sendMessage(chatId, 
-            `❌ Ошибка при проверке пресета "${preset.gift_name}"`
-          );
-        }
-      }
-
-      await this.bot.sendMessage(chatId, 
-        '✅ Проверка завершена!',
-        { reply_markup: mainMenu }
-      );
-    } catch (error) {
-      console.error('Error during check:', error);
-      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Не удалось выполнить проверку'));
-    }
-  }
 
   // Обработчик поиска пресетов
   private async handleSearchPresets(chatId: number): Promise<void> {
@@ -421,20 +353,6 @@ export class CommandHandlers {
     }
   }
 
-  // Обработчик настроек
-  private async handleSettings(chatId: number): Promise<void> {
-    const settingsMessage = 
-      '⚙️ <b>Настройки</b>\n\n' +
-      '🔔 Уведомления: включены\n' +
-      '⏰ Интервал проверки: каждые 30 минут\n' +
-      '📊 Статистика: доступна\n\n' +
-      'Настройки будут доступны в следующих версиях.';
-
-    await this.bot.sendMessage(chatId, settingsMessage, {
-      parse_mode: 'HTML',
-      reply_markup: mainMenu
-    });
-  }
 
   // Обработчик редактирования пресета
   private async handlePresetEdit(chatId: number, _text: string): Promise<void> {
