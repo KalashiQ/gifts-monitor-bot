@@ -25,7 +25,13 @@ export class DatabaseConnection {
           reject(err);
         } else {
           console.log('Подключение к базе данных установлено');
-          resolve();
+          // Включаем foreign key constraints
+          this.db!.run('PRAGMA foreign_keys = ON', (pragmaErr) => {
+            if (pragmaErr) {
+              console.error('Ошибка включения foreign key constraints:', pragmaErr);
+            }
+            resolve();
+          });
         }
       });
     });

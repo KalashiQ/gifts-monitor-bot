@@ -2,9 +2,9 @@ export interface Preset {
   id: number;
   user_id: number;
   gift_name: string;
-  model?: string;
-  background?: string;
-  pattern?: string;
+  model?: string | null;
+  background?: string | null;
+  pattern?: string | null;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;

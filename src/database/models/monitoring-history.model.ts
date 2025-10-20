@@ -27,13 +27,17 @@ export class MonitoringHistoryModel {
 
   public async getById(id: number): Promise<MonitoringHistory> {
     const sql = 'SELECT * FROM monitoring_history WHERE id = ?';
-    const history = await this.db.get<MonitoringHistory>(sql, [id]);
+    const history = await this.db.get<any>(sql, [id]);
     
     if (!history) {
       throw new Error(`Запись истории с ID ${id} не найдена`);
     }
 
-    return history;
+    return {
+      ...history,
+      has_changed: Boolean(history.has_changed),
+      checked_at: new Date(history.checked_at)
+    };
   }
 
   public async getByPresetId(presetId: number, limit?: number): Promise<MonitoringHistory[]> {
@@ -45,7 +49,12 @@ export class MonitoringHistoryModel {
       params.push(limit);
     }
 
-    return this.db.all<MonitoringHistory>(sql, params);
+    const histories = await this.db.all<any>(sql, params);
+    return histories.map(history => ({
+      ...history,
+      has_changed: Boolean(history.has_changed),
+      checked_at: new Date(history.checked_at)
+    }));
   }
 
   public async getLatestByPresetId(presetId: number): Promise<MonitoringHistory | undefined> {
@@ -56,7 +65,16 @@ export class MonitoringHistoryModel {
       LIMIT 1
     `;
     
-    return this.db.get<MonitoringHistory>(sql, [presetId]);
+    const history = await this.db.get<any>(sql, [presetId]);
+    if (!history) {
+      return undefined;
+    }
+
+    return {
+      ...history,
+      has_changed: Boolean(history.has_changed),
+      checked_at: new Date(history.checked_at)
+    };
   }
 
   public async getChangedRecords(limit?: number): Promise<MonitoringHistory[]> {
@@ -68,7 +86,12 @@ export class MonitoringHistoryModel {
       params.push(limit);
     }
 
-    return this.db.all<MonitoringHistory>(sql, params);
+    const histories = await this.db.all<any>(sql, params);
+    return histories.map(history => ({
+      ...history,
+      has_changed: Boolean(history.has_changed),
+      checked_at: new Date(history.checked_at)
+    }));
   }
 
   public async getChangedRecordsByPresetId(presetId: number, limit?: number): Promise<MonitoringHistory[]> {
@@ -80,7 +103,12 @@ export class MonitoringHistoryModel {
       params.push(limit);
     }
 
-    return this.db.all<MonitoringHistory>(sql, params);
+    const histories = await this.db.all<any>(sql, params);
+    return histories.map(history => ({
+      ...history,
+      has_changed: Boolean(history.has_changed),
+      checked_at: new Date(history.checked_at)
+    }));
   }
 
   public async getRecordsByDateRange(
@@ -91,12 +119,17 @@ export class MonitoringHistoryModel {
     const sql = `
       SELECT * FROM monitoring_history 
       WHERE preset_id = ? 
-      AND checked_at >= ? 
-      AND checked_at <= ? 
+      AND checked_at >= datetime(?) 
+      AND checked_at <= datetime(?) 
       ORDER BY checked_at ASC
     `;
     
-    return this.db.all<MonitoringHistory>(sql, [presetId, startDate, endDate]);
+    const histories = await this.db.all<any>(sql, [presetId, startDate.toISOString(), endDate.toISOString()]);
+    return histories.map(history => ({
+      ...history,
+      has_changed: Boolean(history.has_changed),
+      checked_at: new Date(history.checked_at)
+    }));
   }
 
   public async getStatisticsByPresetId(presetId: number): Promise<{

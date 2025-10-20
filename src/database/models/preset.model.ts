@@ -35,28 +35,51 @@ export class PresetModel {
 
   public async getById(id: number): Promise<Preset> {
     const sql = 'SELECT * FROM presets WHERE id = ?';
-    const preset = await this.db.get<Preset>(sql, [id]);
+    const preset = await this.db.get<any>(sql, [id]);
     
     if (!preset) {
       throw new Error(`Пресет с ID ${id} не найден`);
     }
 
-    return preset;
+    return {
+      ...preset,
+      is_active: Boolean(preset.is_active),
+      created_at: new Date(preset.created_at),
+      updated_at: new Date(preset.updated_at)
+    };
   }
 
   public async getByUserId(userId: number): Promise<Preset[]> {
     const sql = 'SELECT * FROM presets WHERE user_id = ? ORDER BY created_at DESC';
-    return this.db.all<Preset>(sql, [userId]);
+    const presets = await this.db.all<any>(sql, [userId]);
+    return presets.map(preset => ({
+      ...preset,
+      is_active: Boolean(preset.is_active),
+      created_at: new Date(preset.created_at),
+      updated_at: new Date(preset.updated_at)
+    }));
   }
 
   public async getActiveByUserId(userId: number): Promise<Preset[]> {
     const sql = 'SELECT * FROM presets WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC';
-    return this.db.all<Preset>(sql, [userId]);
+    const presets = await this.db.all<any>(sql, [userId]);
+    return presets.map(preset => ({
+      ...preset,
+      is_active: Boolean(preset.is_active),
+      created_at: new Date(preset.created_at),
+      updated_at: new Date(preset.updated_at)
+    }));
   }
 
   public async getAllActive(): Promise<Preset[]> {
     const sql = 'SELECT * FROM presets WHERE is_active = 1 ORDER BY created_at DESC';
-    return this.db.all<Preset>(sql);
+    const presets = await this.db.all<any>(sql);
+    return presets.map(preset => ({
+      ...preset,
+      is_active: Boolean(preset.is_active),
+      created_at: new Date(preset.created_at),
+      updated_at: new Date(preset.updated_at)
+    }));
   }
 
   public async update(id: number, data: UpdatePresetData): Promise<Preset> {
@@ -120,7 +143,13 @@ export class PresetModel {
     }
 
     const sql = `SELECT * FROM presets WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC`;
-    return this.db.all<Preset>(sql, params);
+    const presets = await this.db.all<any>(sql, params);
+    return presets.map(preset => ({
+      ...preset,
+      is_active: Boolean(preset.is_active),
+      created_at: new Date(preset.created_at),
+      updated_at: new Date(preset.updated_at)
+    }));
   }
 
   public async toggleActive(id: number): Promise<Preset> {
