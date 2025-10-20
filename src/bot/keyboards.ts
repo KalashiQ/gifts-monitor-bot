@@ -13,10 +13,11 @@ export const mainMenu: ReplyKeyboardMarkup = {
       { text: '🔎 Поиск пресетов' }
     ],
     [
-      { text: '📊 Статистика' },
-      { text: '⚙️ Настройки' }
+      { text: '🔄 Мониторинг' },
+      { text: '📊 Статистика' }
     ],
     [
+      { text: '⚙️ Настройки' },
       { text: 'ℹ️ Помощь' }
     ]
   ],
@@ -247,6 +248,46 @@ export const confirmEditKeyboard = (presetId: number): InlineKeyboardMarkup => (
     [
       { text: '✅ Сохранить изменения', callback_data: JSON.stringify({ action: 'save_edit', presetId }) },
       { text: '❌ Отмена', callback_data: JSON.stringify({ action: 'cancel_edit', presetId }) }
+    ]
+  ]
+});
+
+// Inline клавиатура для управления мониторингом
+export const monitoringKeyboard: InlineKeyboardMarkup = ({
+  inline_keyboard: [
+    [
+      { text: '🔄 Запустить мониторинг', callback_data: JSON.stringify({ action: 'start_monitoring' }) },
+      { text: '⏹️ Остановить мониторинг', callback_data: JSON.stringify({ action: 'stop_monitoring' }) }
+    ],
+    [
+      { text: '🔍 Ручная проверка', callback_data: JSON.stringify({ action: 'manual_check' }) },
+      { text: '📊 Статистика', callback_data: JSON.stringify({ action: 'monitoring_stats' }) }
+    ],
+    [
+      { text: '⚙️ Настройки', callback_data: JSON.stringify({ action: 'monitoring_settings' }) }
+    ],
+    [
+      { text: '⬅️ Назад в меню', callback_data: JSON.stringify({ action: 'back_to_menu' }) }
+    ]
+  ]
+});
+
+// Inline клавиатура для настроек мониторинга
+export const monitoringSettingsKeyboard: InlineKeyboardMarkup = ({
+  inline_keyboard: [
+    [
+      { text: '⏰ Каждую минуту', callback_data: JSON.stringify({ action: 'set_interval', interval: '1' }) },
+      { text: '⏰ Каждые 5 минут', callback_data: JSON.stringify({ action: 'set_interval', interval: '5' }) }
+    ],
+    [
+      { text: '⏰ Каждые 15 минут', callback_data: JSON.stringify({ action: 'set_interval', interval: '15' }) },
+      { text: '⏰ Каждый час', callback_data: JSON.stringify({ action: 'set_interval', interval: '60' }) }
+    ],
+    [
+      { text: '🔄 Круглосуточный', callback_data: JSON.stringify({ action: 'set_24_7' }) }
+    ],
+    [
+      { text: '⬅️ Назад', callback_data: JSON.stringify({ action: 'back_to_monitoring' }) }
     ]
   ]
 });

@@ -1,5 +1,6 @@
 import { Preset, MonitoringHistory } from '../types/database';
 import { PresetDisplayData } from '../types/bot';
+import { MonitoringStats } from '../types/monitoring';
 
 export class MessageFormatter {
   // Форматирование приветственного сообщения
@@ -248,5 +249,24 @@ ${preset.pattern ? `🎨 Узор: ${preset.pattern}` : '🎨 Узор: не у�
   public static formatPresetDeleted(presetName: string): string {
     return `✅ <b>Пресет удален</b>\n\n` +
            `🎁 <b>${presetName}</b> больше не отслеживается`;
+  }
+
+  // Форматирование статистики мониторинга
+  public static formatMonitoringStats(stats: MonitoringStats): string {
+    const status = stats.isRunning ? '🟢 Активен' : '🔴 Остановлен';
+    const lastCheck = stats.lastCheck 
+      ? this.formatDate(stats.lastCheck) 
+      : 'Никогда';
+
+    return `📊 <b>Статистика мониторинга</b>\n\n` +
+           `🔄 <b>Статус:</b> ${status}\n` +
+           `📈 <b>Всего проверок:</b> ${stats.totalChecks}\n` +
+           `✅ <b>Успешных:</b> ${stats.successfulChecks}\n` +
+           `❌ <b>Неудачных:</b> ${stats.failedChecks}\n` +
+           `🎯 <b>Обнаружено изменений:</b> ${stats.totalChanges}\n` +
+           `⏰ <b>Последняя проверка:</b> ${lastCheck}\n\n` +
+           `📊 <b>Эффективность:</b> ${stats.totalChecks > 0 
+             ? Math.round((stats.successfulChecks / stats.totalChecks) * 100) 
+             : 0}%`;
   }
 }

@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 import { DatabaseConnection } from '../database/connection';
 import { Database } from '../database/database';
 import { PresetModel } from '../database/models/preset.model';
-import { MonitoringHistoryModel } from '../database/models/monitoring-history.model';
 import { ParserService } from '../services/parser-service';
 import { TelegramBotService } from '../bot/telegram-bot';
 import { createParserConfig } from '../config/parser-config';
@@ -20,11 +19,11 @@ async function runBotExample() {
     });
 
     // Создаем объект базы данных
-    const database = new Database(db);
+    const database = new Database({ path: './data/example.db' });
 
     // Создаем модели
     const presetModel = new PresetModel(db);
-    const monitoringHistoryModel = new MonitoringHistoryModel(db);
+    // const monitoringHistoryModel = new MonitoringHistoryModel(db); // Не используется в этом примере
 
     // Инициализируем сервис парсера
     const parserConfig = createParserConfig();

@@ -13,6 +13,8 @@
     "bot": "ts-node src/index.ts",
     "bot:dev": "nodemon --exec ts-node src/index.ts",
     "example:bot": "ts-node src/examples/bot-example.ts",
+    "example:monitoring": "ts-node src/examples/monitoring-example.ts",
+    "cleanup": "./scripts/cleanup-bot.sh",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

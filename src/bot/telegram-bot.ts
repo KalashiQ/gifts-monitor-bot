@@ -5,6 +5,7 @@ import { CommandHandlers } from './handlers/command-handlers';
 import { CallbackHandlers } from './handlers/callback-handlers';
 import { PresetModel } from '../database/models/preset.model';
 import { ParserService } from '../services/parser-service';
+import { MonitoringService } from '../services/monitoring-service';
 
 export class TelegramBotService {
   private bot: TelegramBot;
@@ -13,12 +14,14 @@ export class TelegramBotService {
   private callbackHandlers: CallbackHandlers;
   private presetModel: PresetModel;
   private parserService: ParserService;
+  private monitoringService?: MonitoringService;
   private isRunning: boolean = false;
 
   constructor(
     config: BotConfig,
     presetModel: PresetModel,
-    parserService: ParserService
+    parserService: ParserService,
+    monitoringService?: MonitoringService
   ) {
     this.bot = new TelegramBot(config.token, { 
       polling: config.polling !== false 
@@ -26,19 +29,22 @@ export class TelegramBotService {
     this.sessionManager = new SessionManager();
     this.presetModel = presetModel;
     this.parserService = parserService;
+    this.monitoringService = monitoringService;
     
     this.commandHandlers = new CommandHandlers(
       this.bot,
       this.sessionManager,
       this.presetModel,
-      this.parserService
+      this.parserService,
+      this.monitoringService
     );
     
     this.callbackHandlers = new CallbackHandlers(
       this.bot,
       this.presetModel,
       this.parserService,
-      this.sessionManager
+      this.sessionManager,
+      this.monitoringService
     );
 
     this.setupEventHandlers();
@@ -64,6 +70,26 @@ export class TelegramBotService {
     // Обработчик команды /stats
     this.bot.onText(/\/stats/, (msg) => {
       this.commandHandlers.handleStats(msg);
+    });
+
+    // Обработчик команды /monitoring
+    this.bot.onText(/\/monitoring/, (msg) => {
+      this.commandHandlers.handleMonitoring(msg);
+    });
+
+    // Обработчик команды /monitoring_start
+    this.bot.onText(/\/monitoring_start/, (msg) => {
+      this.commandHandlers.handleMonitoringStart(msg);
+    });
+
+    // Обработчик команды /monitoring_stop
+    this.bot.onText(/\/monitoring_stop/, (msg) => {
+      this.commandHandlers.handleMonitoringStop(msg);
+    });
+
+    // Обработчик команды /monitoring_check
+    this.bot.onText(/\/monitoring_check/, (msg) => {
+      this.commandHandlers.handleMonitoringCheck(msg);
     });
 
     // Обработчик текстовых сообщений
@@ -217,6 +243,7 @@ export class TelegramBotService {
     }
   }
 
+
   // Массовая отправка уведомлений
   public async broadcastMessage(
     userIds: number[],
@@ -237,5 +264,24 @@ export class TelegramBotService {
   // Получение всех активных пользователей
   public getActiveUsers(): number[] {
     return this.sessionManager.getAllSessions().map(session => session.userId);
+  }
+
+  // Обновление мониторинга
+  public setMonitoringService(monitoringService: MonitoringService): void {
+    this.monitoringService = monitoringService;
+    this.commandHandlers = new CommandHandlers(
+      this.bot,
+      this.sessionManager,
+      this.presetModel,
+      this.parserService,
+      this.monitoringService
+    );
+    this.callbackHandlers = new CallbackHandlers(
+      this.bot,
+      this.presetModel,
+      this.parserService,
+      this.sessionManager,
+      this.monitoringService
+    );
   }
 }

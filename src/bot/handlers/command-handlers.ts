@@ -3,15 +3,17 @@ import { SessionManager } from '../session-manager';
 import { UserState } from '../../types/bot';
 import { PresetModel } from '../../database/models/preset.model';
 import { ParserService } from '../../services/parser-service';
+import { MonitoringService } from '../../services/monitoring-service';
 import { MessageFormatter } from '../message-formatter';
 import { InputValidator } from '../validators';
-import { mainMenu, cancelKeyboard, skipKeyboard, presetsListKeyboard } from '../keyboards';
+import { mainMenu, cancelKeyboard, skipKeyboard, presetsListKeyboard, monitoringKeyboard } from '../keyboards';
 
 export class CommandHandlers {
   private bot: TelegramBot;
   private sessionManager: SessionManager;
   private presetModel: PresetModel;
   private parserService: ParserService;
+  private monitoringService?: MonitoringService;
 
   // Вспомогательная функция для преобразования Preset в PresetDisplayData
   private convertToPresetDisplayData(preset: any): any {
@@ -29,12 +31,14 @@ export class CommandHandlers {
     bot: TelegramBot,
     sessionManager: SessionManager,
     presetModel: PresetModel,
-    parserService: ParserService
+    parserService: ParserService,
+    monitoringService?: MonitoringService
   ) {
     this.bot = bot;
     this.sessionManager = sessionManager;
     this.presetModel = presetModel;
     this.parserService = parserService;
+    this.monitoringService = monitoringService;
   }
 
   // Обработчик команды /start
@@ -134,6 +138,11 @@ export class CommandHandlers {
 
     if (text === '⚙️ Настройки') {
       await this.handleSettings(chatId);
+      return;
+    }
+
+    if (text === '🔄 Мониторинг') {
+      await this.handleMonitoringButton(msg);
       return;
     }
 
@@ -602,6 +611,125 @@ export class CommandHandlers {
     } catch (error) {
       console.error('Error searching presets:', error);
       await this.bot.sendMessage(chatId, MessageFormatter.formatError('Ошибка при поиске пресетов'));
+    }
+  }
+
+  // Обработчик команды /monitoring
+  public async handleMonitoring(msg: TelegramBot.Message): Promise<void> {
+    const chatId = msg.chat.id;
+
+    if (!this.monitoringService) {
+      await this.bot.sendMessage(chatId, '❌ Сервис мониторинга недоступен');
+      return;
+    }
+
+    try {
+      const stats = this.monitoringService.getStats();
+      const message = MessageFormatter.formatMonitoringStats(stats);
+      
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'HTML',
+        reply_markup: mainMenu
+      });
+    } catch (error) {
+      console.error('Error getting monitoring stats:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Ошибка при получении статистики мониторинга'));
+    }
+  }
+
+  // Обработчик команды /monitoring_start
+  public async handleMonitoringStart(msg: TelegramBot.Message): Promise<void> {
+    const chatId = msg.chat.id;
+
+    if (!this.monitoringService) {
+      await this.bot.sendMessage(chatId, '❌ Сервис мониторинга недоступен');
+      return;
+    }
+
+    try {
+      await this.monitoringService.start();
+      await this.bot.sendMessage(chatId, '✅ Мониторинг запущен', {
+        reply_markup: mainMenu
+      });
+    } catch (error) {
+      console.error('Error starting monitoring:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Ошибка при запуске мониторинга'));
+    }
+  }
+
+  // Обработчик команды /monitoring_stop
+  public async handleMonitoringStop(msg: TelegramBot.Message): Promise<void> {
+    const chatId = msg.chat.id;
+
+    if (!this.monitoringService) {
+      await this.bot.sendMessage(chatId, '❌ Сервис мониторинга недоступен');
+      return;
+    }
+
+    try {
+      await this.monitoringService.stop();
+      await this.bot.sendMessage(chatId, '⏹️ Мониторинг остановлен', {
+        reply_markup: mainMenu
+      });
+    } catch (error) {
+      console.error('Error stopping monitoring:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Ошибка при остановке мониторинга'));
+    }
+  }
+
+  // Обработчик команды /monitoring_check
+  public async handleMonitoringCheck(msg: TelegramBot.Message): Promise<void> {
+    const chatId = msg.chat.id;
+
+    if (!this.monitoringService) {
+      await this.bot.sendMessage(chatId, '❌ Сервис мониторинга недоступен');
+      return;
+    }
+
+    try {
+      await this.bot.sendMessage(chatId, '🔄 Запуск ручной проверки...');
+      await this.monitoringService.performMonitoringCycle();
+      await this.bot.sendMessage(chatId, '✅ Ручная проверка завершена', {
+        reply_markup: mainMenu
+      });
+    } catch (error) {
+      console.error('Error performing manual check:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Ошибка при выполнении ручной проверки'));
+    }
+  }
+
+  // Обработчик кнопки "Мониторинг"
+  public async handleMonitoringButton(msg: TelegramBot.Message): Promise<void> {
+    const chatId = msg.chat.id;
+
+    if (!this.monitoringService) {
+      await this.bot.sendMessage(chatId, '❌ Сервис мониторинга недоступен');
+      return;
+    }
+
+    try {
+      const stats = this.monitoringService.getStats();
+      const message = `🔄 *Управление мониторингом*\n\n` +
+                     `📊 *Статус:* ${stats.isRunning ? '🟢 Активен' : '🔴 Остановлен'}\n` +
+                     `📈 *Всего проверок:* ${stats.totalChecks}\n` +
+                     `✅ *Успешных:* ${stats.successfulChecks}\n` +
+                     `❌ *Неудачных:* ${stats.failedChecks}\n` +
+                     `🎯 *Обнаружено изменений:* ${stats.totalChanges}\n` +
+                     `⏰ *Последняя проверка:* ${stats.lastCheck ? stats.lastCheck.toLocaleString('ru-RU') : 'Никогда'}\n\n` +
+                     `Выберите действие:`;
+
+      const sentMessage = await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'HTML',
+        reply_markup: monitoringKeyboard
+      });
+
+      // Сохраняем ID сообщения для автоматического обновления
+      if (sentMessage.message_id) {
+        this.monitoringService.setStatsMessageId(chatId, sentMessage.message_id);
+      }
+    } catch (error) {
+      console.error('Error showing monitoring menu:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Ошибка при отображении меню мониторинга'));
     }
   }
 
