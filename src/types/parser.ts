@@ -19,6 +19,7 @@ export interface SearchResult {
   items: GiftItem[];
   searchCriteria: SearchCriteria;
   timestamp: Date;
+  lastGiftLink?: string; // Ссылка на последний подарок
 }
 
 export interface GiftItem {

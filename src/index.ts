@@ -84,6 +84,13 @@ async function main() {
       throw new Error('TELEGRAM_BOT_TOKEN is not set in environment variables');
     }
 
+    // Проверяем формат токена
+    if (!botToken.match(/^\d+:[A-Za-z0-9_-]+$/)) {
+      throw new Error('TELEGRAM_BOT_TOKEN has invalid format. Expected format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz');
+    }
+
+    console.log(`🤖 Bot token: ${botToken.substring(0, 10)}...`);
+
     // Инициализируем базу данных
     console.log('📊 Initializing database...');
     const database = new Database({ path: process.env.DATABASE_PATH || './data/gifts-monitor.db' });
@@ -116,6 +123,11 @@ async function main() {
     // Инициализируем бота
     console.log('🤖 Initializing Telegram bot...');
     const bot = new TelegramBotService(botConfig, presetModel, parserService);
+
+    // Выводим информацию о контроле доступа
+    console.log('🔐 Access control status:');
+    console.log(`   - Enabled: ${bot.isAccessControlEnabled()}`);
+    console.log(`   - Allowed users: ${bot.getAllowedUsers().join(', ')}`);
 
     // Инициализируем сервис мониторинга
     console.log('📊 Initializing monitoring service...');

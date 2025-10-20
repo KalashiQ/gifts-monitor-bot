@@ -248,13 +248,30 @@ export class MonitoringService {
     const { preset, oldCount, newCount } = change;
     
     try {
+      // Получаем ссылку на последний подарок только при изменениях
+      let giftLink: string | undefined;
+      if (change.hasChanged) {
+        try {
+          console.log(`🔗 Получение ссылки на подарок для пресета "${preset.gift_name}"...`);
+          giftLink = await this.parserService.getLastGiftLink(preset);
+          if (giftLink) {
+            console.log(`✅ Ссылка получена: ${giftLink}`);
+          } else {
+            console.log(`⚠️ Ссылка не найдена для пресета "${preset.gift_name}"`);
+          }
+        } catch (linkError) {
+          console.log(`⚠️ Ошибка получения ссылки на подарок: ${linkError}`);
+          // Продолжаем без ссылки
+        }
+      }
+      
       // Формируем сообщение
-      const message = this.formatChangeNotification(preset, oldCount, newCount);
+      const message = this.formatChangeNotification(preset, oldCount, newCount, giftLink);
       
       // Отправляем уведомление пользователю
       await this.telegramBot.sendMessage(preset.user_id, message);
       
-      console.log(`📤 Уведомление отправлено пользователю ${preset.user_id} о пресете "${preset.gift_name}"`);
+      console.log(`📤 Уведомление отправлено пользователю ${preset.user_id} о пресете "${preset.gift_name}"${giftLink ? ` со ссылкой` : ''}`);
     } catch (error: any) {
       if (error.response?.body?.error_code === 409) {
         console.log(`⚠️ Конфликт с другим экземпляром бота для пользователя ${preset.user_id}. Пропускаем уведомление.`);
@@ -268,7 +285,8 @@ export class MonitoringService {
   private formatChangeNotification(
     preset: Preset,
     oldCount: number,
-    newCount: number
+    newCount: number,
+    giftLink?: string
   ): string {
     const changeDirection = newCount > oldCount ? '📈' : '📉';
     const changeText = newCount > oldCount ? 'увеличилось' : 'уменьшилось';
@@ -289,9 +307,14 @@ export class MonitoringService {
     message += `\n${changeDirection} Количество ${changeText}: *${oldCount}* → *${newCount}*\n`;
     message += `📊 Разница: *${Math.abs(newCount - oldCount)}*\n`;
     
+    // Добавляем ссылку на конкретный подарок, если есть
+    if (giftLink) {
+      message += `\n🎁 [Посмотреть последний подарок](${giftLink})`;
+    }
+    
     // Добавляем ссылку на поиск
     const searchUrl = this.generateSearchUrl(preset);
-    message += `\n🔗 [Посмотреть на peek.tg](${searchUrl})`;
+    message += `\n🔗 [Посмотреть все на peek.tg](${searchUrl})`;
     
     return message;
   }

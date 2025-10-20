@@ -36,6 +36,29 @@ export class ParserService {
     }
   }
 
+  public async getLastGiftLink(preset: Preset): Promise<string | undefined> {
+    if (!this.isInitialized) {
+      throw new Error('ParserService не инициализирован');
+    }
+
+    try {
+      const criteria = this.convertPresetToSearchCriteria(preset);
+      return await this.parser.getLastGiftLink(criteria);
+    } catch (error) {
+      console.error(`❌ Ошибка получения ссылки для пресета ${preset.id}:`, error);
+      throw error;
+    }
+  }
+
+  private convertPresetToSearchCriteria(preset: Preset): SearchCriteria {
+    return {
+      gift_name: preset.gift_name,
+      model: preset.model || undefined,
+      background: preset.background || undefined,
+      pattern: preset.pattern || undefined
+    };
+  }
+
   public async searchGifts(criteria: SearchCriteria): Promise<SearchResult> {
     if (!this.isInitialized) {
       throw new Error('ParserService не инициализирован');

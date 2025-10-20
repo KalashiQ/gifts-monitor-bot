@@ -600,6 +600,57 @@ export class PeekTgParser {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  public async getLastGiftLink(criteria: SearchCriteria): Promise<string | undefined> {
+    if (!this.browser) {
+      throw new Error('Браузер не инициализирован. Вызовите initialize() сначала.');
+    }
+
+    const startTime = Date.now();
+    this.stats.totalRequests++;
+
+    try {
+      console.log(`🔗 Получение ссылки на последний подарок: ${criteria.gift_name}${criteria.model ? ` (${criteria.model})` : ''}`);
+      
+      const page = await this.browser.newPage();
+      
+      // Настройка страницы
+      await this.setupPage(page);
+      
+      // Переход на сайт
+      await page.goto(this.config.baseUrl, { 
+        waitUntil: 'networkidle',
+        timeout: this.config.timeout 
+      });
+
+      // Выполнение поиска
+      await this.performSearch(page, criteria);
+
+      // Получение ссылки на последний подарок
+      const lastGiftLink = await this.extractLastGiftLink(page);
+      
+      await page.close();
+
+      const responseTime = Date.now() - startTime;
+      this.updateStats(true, responseTime);
+
+      console.log(`✅ Ссылка получена за ${responseTime}ms${lastGiftLink ? `: ${lastGiftLink}` : ' (не найдена)'}`);
+      return lastGiftLink;
+
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      this.updateStats(false, responseTime);
+      
+      const parserError: ParserError = {
+        message: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        code: 'LINK_EXTRACTION_FAILED',
+        timestamp: new Date()
+      };
+
+      console.error('❌ Ошибка получения ссылки:', parserError.message);
+      throw parserError;
+    }
+  }
+
   public getStats(): ParserStats {
     return { ...this.stats };
   }
@@ -611,5 +662,164 @@ export class PeekTgParser {
       failedRequests: 0,
       averageResponseTime: 0
     };
+  }
+
+  private async extractLastGiftLink(page: Page): Promise<string | undefined> {
+    console.log('  🔗 Поиск ссылки на последний подарок...');
+
+    try {
+      // Принудительно закрываем модальное окно подписки
+      await this.closeSubscriptionModal(page);
+      
+      // Дополнительная проверка и закрытие через JavaScript
+      await page.evaluate(() => {
+        // Удаляем все модальные окна
+        const modals = document.querySelectorAll('[id*="modal"], [class*="modal"], [id*="subscribe"]');
+        modals.forEach(modal => {
+          if (modal instanceof HTMLElement) {
+            modal.style.display = 'none';
+            modal.remove();
+          }
+        });
+        
+        // Удаляем overlay элементы
+        const overlays = document.querySelectorAll('[class*="overlay"], [class*="backdrop"]');
+        overlays.forEach(overlay => {
+          if (overlay instanceof HTMLElement) {
+            overlay.style.display = 'none';
+            overlay.remove();
+          }
+        });
+      });
+
+      // Ищем блок с подарками
+      const giftsContainer = await page.$('div.grid.gap-2.md\\:gap-3.grid-cols-3.sm\\:grid-cols-4.md\\:grid-cols-5.lg\\:grid-cols-6.mb-5');
+      
+      if (!giftsContainer) {
+        console.log('  ⚠️ Контейнер с подарками не найден');
+        return undefined;
+      }
+
+      // Находим все карточки подарков
+      const giftCards = await giftsContainer.$$('div > div');
+      
+      if (giftCards.length === 0) {
+        console.log('  ⚠️ Карточки подарков не найдены');
+        return undefined;
+      }
+
+      // Берем последнюю карточку
+      const lastGiftCard = giftCards[giftCards.length - 1];
+      
+      // Кликаем на последний подарок с принудительным кликом
+      console.log('  🖱️ Кликаем на последний подарок...');
+      
+      try {
+        // Пробуем обычный клик
+        await lastGiftCard.click({ timeout: 5000 });
+      } catch (clickError) {
+        console.log('  ⚠️ Обычный клик не сработал, пробуем принудительный...');
+        // Принудительный клик через JavaScript
+        await page.evaluate((element) => {
+          if (element && element instanceof HTMLElement) {
+            element.click();
+          }
+        }, lastGiftCard);
+      }
+      
+      // Ждем загрузки страницы подарка
+      await page.waitForTimeout(3000);
+      
+      // Ищем ссылку на Telegram
+      const telegramLink = await page.$('a[href*="t.me/nft/"]');
+      
+      if (telegramLink) {
+        const href = await telegramLink.getAttribute('href');
+        if (href) {
+          console.log(`  ✅ Найдена ссылка на подарок: ${href}`);
+          return href;
+        }
+      }
+
+      // Альтернативный способ - ищем в URL страницы
+      const currentUrl = page.url();
+      const urlMatch = currentUrl.match(/\/gifts\/([^\/]+)/);
+      if (urlMatch) {
+        const giftId = urlMatch[1];
+        const telegramUrl = `https://t.me/nft/${giftId}`;
+        console.log(`  ✅ Ссылка получена из URL: ${telegramUrl}`);
+        return telegramUrl;
+      }
+
+      console.log('  ⚠️ Ссылка на Telegram не найдена');
+      return undefined;
+
+    } catch (error) {
+      console.log(`  ⚠️ Ошибка при получении ссылки на подарок: ${error}`);
+      return undefined;
+    }
+  }
+
+  private async closeSubscriptionModal(page: Page): Promise<void> {
+    try {
+      // Ищем модальное окно подписки
+      const modal = await page.$('#subscribe-modal-portal');
+      if (modal) {
+        console.log('  🚫 Закрываем модальное окно подписки...');
+        
+        // Пробуем несколько способов закрытия
+        const closeSelectors = [
+          'button[aria-label="Close"]',
+          'button[aria-label="close"]', 
+          'button:has-text("×")',
+          'button:has-text("✕")',
+          'button[class*="close"]',
+          'button[class*="Close"]',
+          '[data-testid="close"]',
+          '.close-button',
+          'button[type="button"]:has(svg)'
+        ];
+        
+        let closed = false;
+        for (const selector of closeSelectors) {
+          try {
+            const closeButton = await page.$(selector);
+            if (closeButton) {
+              await closeButton.click();
+              await page.waitForTimeout(1000);
+              closed = true;
+              break;
+            }
+          } catch (e) {
+            // Продолжаем с следующим селектором
+          }
+        }
+        
+        // Если кнопка не найдена, пробуем Escape
+        if (!closed) {
+          await page.keyboard.press('Escape');
+          await page.waitForTimeout(1000);
+        }
+        
+        // Принудительно скрываем модальное окно через JavaScript
+        await page.evaluate(() => {
+          const modal = document.getElementById('subscribe-modal-portal');
+          if (modal) {
+            modal.style.display = 'none';
+            modal.remove();
+          }
+        });
+        
+        // Проверяем, что модальное окно закрылось
+        const isModalVisible = await page.$('#subscribe-modal-portal');
+        if (!isModalVisible) {
+          console.log('  ✅ Модальное окно закрыто');
+        } else {
+          console.log('  ⚠️ Модальное окно все еще видимо, продолжаем...');
+        }
+      }
+    } catch (error) {
+      console.log('  ⚠️ Не удалось закрыть модальное окно:', error);
+    }
   }
 }

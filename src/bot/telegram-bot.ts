@@ -6,6 +6,8 @@ import { CallbackHandlers } from './handlers/callback-handlers';
 import { PresetModel } from '../database/models/preset.model';
 import { ParserService } from '../services/parser-service';
 import { MonitoringService } from '../services/monitoring-service';
+import { AccessControlMiddleware } from './middleware/access-control';
+import { createAccessControlConfig } from '../config/access-control';
 
 export class TelegramBotService {
   private bot: TelegramBot;
@@ -15,6 +17,7 @@ export class TelegramBotService {
   private presetModel: PresetModel;
   private parserService: ParserService;
   private monitoringService?: MonitoringService;
+  private accessControl: AccessControlMiddleware;
   private isRunning: boolean = false;
 
   constructor(
@@ -30,6 +33,7 @@ export class TelegramBotService {
     this.presetModel = presetModel;
     this.parserService = parserService;
     this.monitoringService = monitoringService;
+    this.accessControl = new AccessControlMiddleware(createAccessControlConfig(), this.bot);
     
     this.commandHandlers = new CommandHandlers(
       this.bot,
@@ -53,56 +57,56 @@ export class TelegramBotService {
   // Настройка обработчиков событий
   private setupEventHandlers(): void {
     // Обработчик команды /start
-    this.bot.onText(/\/start/, (msg) => {
-      this.commandHandlers.handleStart(msg);
-    });
+    this.bot.onText(/\/start/, this.accessControl.checkAccess(async (msg) => {
+      await this.commandHandlers.handleStart(msg);
+    }));
 
     // Обработчик команды /help
-    this.bot.onText(/\/help/, (msg) => {
-      this.commandHandlers.handleHelp(msg);
-    });
+    this.bot.onText(/\/help/, this.accessControl.checkAccess(async (msg) => {
+      await this.commandHandlers.handleHelp(msg);
+    }));
 
     // Обработчик команды /menu
-    this.bot.onText(/\/menu/, (msg) => {
-      this.commandHandlers.handleMenu(msg);
-    });
+    this.bot.onText(/\/menu/, this.accessControl.checkAccess(async (msg) => {
+      await this.commandHandlers.handleMenu(msg);
+    }));
 
     // Обработчик команды /stats
-    this.bot.onText(/\/stats/, (msg) => {
-      this.commandHandlers.handleStats(msg);
-    });
+    this.bot.onText(/\/stats/, this.accessControl.checkAccess(async (msg) => {
+      await this.commandHandlers.handleStats(msg);
+    }));
 
     // Обработчик команды /monitoring
-    this.bot.onText(/\/monitoring/, (msg) => {
-      this.commandHandlers.handleMonitoring(msg);
-    });
+    this.bot.onText(/\/monitoring/, this.accessControl.checkAccess(async (msg) => {
+      await this.commandHandlers.handleMonitoring(msg);
+    }));
 
     // Обработчик команды /monitoring_start
-    this.bot.onText(/\/monitoring_start/, (msg) => {
-      this.commandHandlers.handleMonitoringStart(msg);
-    });
+    this.bot.onText(/\/monitoring_start/, this.accessControl.checkAccess(async (msg) => {
+      await this.commandHandlers.handleMonitoringStart(msg);
+    }));
 
     // Обработчик команды /monitoring_stop
-    this.bot.onText(/\/monitoring_stop/, (msg) => {
-      this.commandHandlers.handleMonitoringStop(msg);
-    });
+    this.bot.onText(/\/monitoring_stop/, this.accessControl.checkAccess(async (msg) => {
+      await this.commandHandlers.handleMonitoringStop(msg);
+    }));
 
     // Обработчик команды /monitoring_check
-    this.bot.onText(/\/monitoring_check/, (msg) => {
-      this.commandHandlers.handleMonitoringCheck(msg);
-    });
+    this.bot.onText(/\/monitoring_check/, this.accessControl.checkAccess(async (msg) => {
+      await this.commandHandlers.handleMonitoringCheck(msg);
+    }));
 
     // Обработчик текстовых сообщений
-    this.bot.on('message', (msg) => {
+    this.bot.on('message', this.accessControl.checkAccess(async (msg) => {
       if (msg.text && !msg.text.startsWith('/')) {
-        this.commandHandlers.handleTextMessage(msg);
+        await this.commandHandlers.handleTextMessage(msg);
       }
-    });
+    }));
 
     // Обработчик callback запросов
-    this.bot.on('callback_query', (query) => {
-      this.callbackHandlers.handleCallbackQuery(query);
-    });
+    this.bot.on('callback_query', this.accessControl.checkCallbackAccess(async (query) => {
+      await this.callbackHandlers.handleCallbackQuery(query);
+    }));
 
     // Обработчик ошибок
     this.bot.on('error', (error) => {
@@ -283,5 +287,30 @@ export class TelegramBotService {
       this.sessionManager,
       this.monitoringService
     );
+  }
+
+  // Методы управления доступом
+  public isUserAllowed(userId: number): boolean {
+    return this.accessControl.isUserAllowed(userId);
+  }
+
+  public getAllowedUsers(): number[] {
+    return this.accessControl.getAllowedUsers();
+  }
+
+  public addAllowedUser(userId: number): void {
+    this.accessControl.addAllowedUser(userId);
+  }
+
+  public removeAllowedUser(userId: number): void {
+    this.accessControl.removeAllowedUser(userId);
+  }
+
+  public isAccessControlEnabled(): boolean {
+    return this.accessControl.isEnabled();
+  }
+
+  public setAccessControlEnabled(enabled: boolean): void {
+    this.accessControl.setEnabled(enabled);
   }
 }
