@@ -37,7 +37,8 @@ export class TelegramBotService {
     this.callbackHandlers = new CallbackHandlers(
       this.bot,
       this.presetModel,
-      this.parserService
+      this.parserService,
+      this.sessionManager
     );
 
     this.setupEventHandlers();

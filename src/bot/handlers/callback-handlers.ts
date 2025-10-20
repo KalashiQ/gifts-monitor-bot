@@ -3,6 +3,8 @@ import { PresetModel } from '../../database/models/preset.model';
 import { ParserService } from '../../services/parser-service';
 import { MessageFormatter } from '../message-formatter';
 import { InputValidator } from '../validators';
+import { SessionManager } from '../session-manager';
+import { UserState } from '../../types/bot';
 import { 
   presetActions, 
   presetsListKeyboard, 
@@ -17,6 +19,7 @@ export class CallbackHandlers {
   private bot: TelegramBot;
   private presetModel: PresetModel;
   private parserService: ParserService;
+  private sessionManager: SessionManager;
 
   // Вспомогательная функция для преобразования Preset в PresetDisplayData
   private convertToPresetDisplayData(preset: any): any {
@@ -33,11 +36,13 @@ export class CallbackHandlers {
   constructor(
     bot: TelegramBot,
     presetModel: PresetModel,
-    parserService: ParserService
+    parserService: ParserService,
+    sessionManager: SessionManager
   ) {
     this.bot = bot;
     this.presetModel = presetModel;
     this.parserService = parserService;
+    this.sessionManager = sessionManager;
   }
 
   // Основной обработчик callback запросов
@@ -99,6 +104,30 @@ export class CallbackHandlers {
         break;
       case 'next_page':
         await this.handleNextPage(chatId, messageId, data.page);
+        break;
+      case 'edit_gift':
+        await this.handleEditGift(chatId, messageId, data.presetId);
+        break;
+      case 'edit_model':
+        await this.handleEditModel(chatId, messageId, data.presetId);
+        break;
+      case 'edit_background':
+        await this.handleEditBackground(chatId, messageId, data.presetId);
+        break;
+      case 'edit_pattern':
+        await this.handleEditPattern(chatId, messageId, data.presetId);
+        break;
+      case 'search_presets':
+        await this.handleSearchPresets(chatId, messageId);
+        break;
+      case 'filter_active':
+        await this.handleFilterActive(chatId, messageId, data.filter);
+        break;
+      case 'filter_inactive':
+        await this.handleFilterInactive(chatId, messageId, data.filter);
+        break;
+      case 'filter_all':
+        await this.handleFilterAll(chatId, messageId, data.filter);
         break;
       case 'noop':
         await this.bot.answerCallbackQuery(query.id);
@@ -394,6 +423,177 @@ export class CallbackHandlers {
       });
     } catch (error) {
       console.error('Error handling next page:', error);
+    }
+  }
+
+  // Редактирование названия подарка
+  private async handleEditGift(chatId: number, messageId: number, presetId: number): Promise<void> {
+    try {
+      const preset = await this.presetModel.getById(presetId);
+      const editMessage = 
+        `✏️ <b>Редактирование названия подарка</b>\n\n` +
+        `Текущее название: <b>${preset.gift_name}</b>\n\n` +
+        `Введите новое название подарка:`;
+
+      await this.bot.editMessageText(editMessage, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '❌ Отмена', callback_data: JSON.stringify({ action: 'edit_preset', presetId }) }]] }
+      });
+
+      // Устанавливаем состояние для редактирования
+      this.sessionManager.updateState(chatId, UserState.EDITING_PRESET_GIFT);
+      this.sessionManager.setData(chatId, 'editing_preset_id', presetId);
+    } catch (error) {
+      console.error('Error editing gift:', error);
+    }
+  }
+
+  // Редактирование модели
+  private async handleEditModel(chatId: number, messageId: number, presetId: number): Promise<void> {
+    try {
+      const preset = await this.presetModel.getById(presetId);
+      const currentModel = preset.model || 'не указана';
+      const editMessage = 
+        `✏️ <b>Редактирование модели</b>\n\n` +
+        `Текущая модель: <b>${currentModel}</b>\n\n` +
+        `Введите новую модель или "удалить" для очистки:`;
+
+      await this.bot.editMessageText(editMessage, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '❌ Отмена', callback_data: JSON.stringify({ action: 'edit_preset', presetId }) }]] }
+      });
+
+      this.sessionManager.updateState(chatId, UserState.EDITING_PRESET_MODEL);
+      this.sessionManager.setData(chatId, 'editing_preset_id', presetId);
+    } catch (error) {
+      console.error('Error editing model:', error);
+    }
+  }
+
+  // Редактирование фона
+  private async handleEditBackground(chatId: number, messageId: number, presetId: number): Promise<void> {
+    try {
+      const preset = await this.presetModel.getById(presetId);
+      const currentBackground = preset.background || 'не указан';
+      const editMessage = 
+        `✏️ <b>Редактирование фона</b>\n\n` +
+        `Текущий фон: <b>${currentBackground}</b>\n\n` +
+        `Введите новый фон или "удалить" для очистки:`;
+
+      await this.bot.editMessageText(editMessage, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '❌ Отмена', callback_data: JSON.stringify({ action: 'edit_preset', presetId }) }]] }
+      });
+
+      this.sessionManager.updateState(chatId, UserState.EDITING_PRESET_BACKGROUND);
+      this.sessionManager.setData(chatId, 'editing_preset_id', presetId);
+    } catch (error) {
+      console.error('Error editing background:', error);
+    }
+  }
+
+  // Редактирование узора
+  private async handleEditPattern(chatId: number, messageId: number, presetId: number): Promise<void> {
+    try {
+      const preset = await this.presetModel.getById(presetId);
+      const currentPattern = preset.pattern || 'не указан';
+      const editMessage = 
+        `✏️ <b>Редактирование узора</b>\n\n` +
+        `Текущий узор: <b>${currentPattern}</b>\n\n` +
+        `Введите новый узор или "удалить" для очистки:`;
+
+      await this.bot.editMessageText(editMessage, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '❌ Отмена', callback_data: JSON.stringify({ action: 'edit_preset', presetId }) }]] }
+      });
+
+      this.sessionManager.updateState(chatId, UserState.EDITING_PRESET_PATTERN);
+      this.sessionManager.setData(chatId, 'editing_preset_id', presetId);
+    } catch (error) {
+      console.error('Error editing pattern:', error);
+    }
+  }
+
+  // Поиск пресетов
+  private async handleSearchPresets(chatId: number, messageId: number): Promise<void> {
+    const searchMessage = 
+      `🔍 <b>Поиск пресетов</b>\n\n` +
+      `Введите название подарка для поиска:`;
+
+    await this.bot.editMessageText(searchMessage, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: '❌ Отмена', callback_data: JSON.stringify({ action: 'back_to_presets' }) }]] }
+    });
+  }
+
+  // Фильтр активных пресетов
+  private async handleFilterActive(chatId: number, messageId: number, _filter: any): Promise<void> {
+    try {
+      const presets = await this.presetModel.getActiveByUserId(chatId);
+      const displayData = presets.map(preset => this.convertToPresetDisplayData(preset));
+
+      const message = MessageFormatter.formatPresetsList(displayData, 0, 5, 'Активные пресеты');
+      const keyboard = presetsListKeyboard(displayData, 0, 5);
+
+      await this.bot.editMessageText(message, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error filtering active presets:', error);
+    }
+  }
+
+  // Фильтр неактивных пресетов
+  private async handleFilterInactive(chatId: number, messageId: number, _filter: any): Promise<void> {
+    try {
+      const allPresets = await this.presetModel.getByUserId(chatId);
+      const presets = allPresets.filter(p => !p.is_active);
+      const displayData = presets.map(preset => this.convertToPresetDisplayData(preset));
+
+      const message = MessageFormatter.formatPresetsList(displayData, 0, 5, 'Неактивные пресеты');
+      const keyboard = presetsListKeyboard(displayData, 0, 5);
+
+      await this.bot.editMessageText(message, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error filtering inactive presets:', error);
+    }
+  }
+
+  // Показать все пресеты
+  private async handleFilterAll(chatId: number, messageId: number, _filter: any): Promise<void> {
+    try {
+      const presets = await this.presetModel.getByUserId(chatId);
+      const displayData = presets.map(preset => this.convertToPresetDisplayData(preset));
+
+      const message = MessageFormatter.formatPresetsList(displayData, 0, 5, 'Все пресеты');
+      const keyboard = presetsListKeyboard(displayData, 0, 5);
+
+      await this.bot.editMessageText(message, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing all presets:', error);
     }
   }
 }

@@ -5,7 +5,7 @@ import { PresetModel } from '../../database/models/preset.model';
 import { ParserService } from '../../services/parser-service';
 import { MessageFormatter } from '../message-formatter';
 import { InputValidator } from '../validators';
-import { mainMenu, cancelKeyboard, skipKeyboard } from '../keyboards';
+import { mainMenu, cancelKeyboard, skipKeyboard, presetsListKeyboard } from '../keyboards';
 
 export class CommandHandlers {
   private bot: TelegramBot;
@@ -127,6 +127,11 @@ export class CommandHandlers {
       return;
     }
 
+    if (text === '🔎 Поиск пресетов') {
+      await this.handleSearchPresets(chatId);
+      return;
+    }
+
     if (text === '⚙️ Настройки') {
       await this.handleSettings(chatId);
       return;
@@ -153,6 +158,21 @@ export class CommandHandlers {
         break;
       case UserState.EDITING_PRESET:
         await this.handlePresetEdit(chatId, text);
+        break;
+      case UserState.EDITING_PRESET_GIFT:
+        await this.handleEditGiftInput(chatId, text);
+        break;
+      case UserState.EDITING_PRESET_MODEL:
+        await this.handleEditModelInput(chatId, text);
+        break;
+      case UserState.EDITING_PRESET_BACKGROUND:
+        await this.handleEditBackgroundInput(chatId, text);
+        break;
+      case UserState.EDITING_PRESET_PATTERN:
+        await this.handleEditPatternInput(chatId, text);
+        break;
+      case UserState.SEARCHING_PRESETS:
+        await this.handleSearchInput(chatId, text);
         break;
       default:
         await this.handleUnknownCommand(chatId, text);
@@ -373,6 +393,25 @@ export class CommandHandlers {
     }
   }
 
+  // Обработчик поиска пресетов
+  private async handleSearchPresets(chatId: number): Promise<void> {
+    try {
+      const presets = await this.presetModel.getByUserId(chatId);
+      const displayData = presets.map(preset => this.convertToPresetDisplayData(preset));
+
+      const message = MessageFormatter.formatPresetsList(displayData, 0, 5, 'Поиск и фильтрация пресетов');
+      const keyboard = presetsListKeyboard(displayData, 0, 5);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing search presets:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Не удалось загрузить пресеты для поиска'));
+    }
+  }
+
   // Обработчик настроек
   private async handleSettings(chatId: number): Promise<void> {
     const settingsMessage = 
@@ -392,6 +431,178 @@ export class CommandHandlers {
   private async handlePresetEdit(chatId: number, _text: string): Promise<void> {
     // TODO: реализовать редактирование пресета
     await this.bot.sendMessage(chatId, 'Функция редактирования в разработке');
+  }
+
+  // Обработчик ввода нового названия подарка при редактировании
+  private async handleEditGiftInput(chatId: number, text: string): Promise<void> {
+    const validation = InputValidator.validateGiftName(text);
+    if (!validation.isValid) {
+      await this.bot.sendMessage(chatId, validation.error!, {
+        reply_markup: cancelKeyboard
+      });
+      return;
+    }
+
+    try {
+      const session = this.sessionManager.getSession(chatId);
+      const presetId = session.data.editing_preset_id;
+      
+      await this.presetModel.update(presetId, { gift_name: text.trim() });
+      this.sessionManager.resetSession(chatId);
+
+      const successMessage = `✅ Название подарка обновлено на: <b>${text.trim()}</b>`;
+      await this.bot.sendMessage(chatId, successMessage, {
+        parse_mode: 'HTML',
+        reply_markup: mainMenu
+      });
+    } catch (error) {
+      console.error('Error updating gift name:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Не удалось обновить название подарка'));
+    }
+  }
+
+  // Обработчик ввода новой модели при редактировании
+  private async handleEditModelInput(chatId: number, text: string): Promise<void> {
+    let newModel: string | null = null;
+    
+    if (text.toLowerCase() === 'удалить') {
+      newModel = null;
+    } else {
+      const validation = InputValidator.validateModel(text);
+      if (!validation.isValid) {
+        await this.bot.sendMessage(chatId, validation.error!, {
+          reply_markup: cancelKeyboard
+        });
+        return;
+      }
+      newModel = text.trim();
+    }
+
+    try {
+      const session = this.sessionManager.getSession(chatId);
+      const presetId = session.data.editing_preset_id;
+      
+      await this.presetModel.update(presetId, { model: newModel || undefined });
+      this.sessionManager.resetSession(chatId);
+
+      const successMessage = newModel 
+        ? `✅ Модель обновлена на: <b>${newModel}</b>`
+        : `✅ Модель удалена`;
+      await this.bot.sendMessage(chatId, successMessage, {
+        parse_mode: 'HTML',
+        reply_markup: mainMenu
+      });
+    } catch (error) {
+      console.error('Error updating model:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Не удалось обновить модель'));
+    }
+  }
+
+  // Обработчик ввода нового фона при редактировании
+  private async handleEditBackgroundInput(chatId: number, text: string): Promise<void> {
+    let newBackground: string | null = null;
+    
+    if (text.toLowerCase() === 'удалить') {
+      newBackground = null;
+    } else {
+      const validation = InputValidator.validateBackground(text);
+      if (!validation.isValid) {
+        await this.bot.sendMessage(chatId, validation.error!, {
+          reply_markup: cancelKeyboard
+        });
+        return;
+      }
+      newBackground = text.trim();
+    }
+
+    try {
+      const session = this.sessionManager.getSession(chatId);
+      const presetId = session.data.editing_preset_id;
+      
+      await this.presetModel.update(presetId, { background: newBackground || undefined });
+      this.sessionManager.resetSession(chatId);
+
+      const successMessage = newBackground 
+        ? `✅ Фон обновлен на: <b>${newBackground}</b>`
+        : `✅ Фон удален`;
+      await this.bot.sendMessage(chatId, successMessage, {
+        parse_mode: 'HTML',
+        reply_markup: mainMenu
+      });
+    } catch (error) {
+      console.error('Error updating background:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Не удалось обновить фон'));
+    }
+  }
+
+  // Обработчик ввода нового узора при редактировании
+  private async handleEditPatternInput(chatId: number, text: string): Promise<void> {
+    let newPattern: string | null = null;
+    
+    if (text.toLowerCase() === 'удалить') {
+      newPattern = null;
+    } else {
+      const validation = InputValidator.validatePattern(text);
+      if (!validation.isValid) {
+        await this.bot.sendMessage(chatId, validation.error!, {
+          reply_markup: cancelKeyboard
+        });
+        return;
+      }
+      newPattern = text.trim();
+    }
+
+    try {
+      const session = this.sessionManager.getSession(chatId);
+      const presetId = session.data.editing_preset_id;
+      
+      await this.presetModel.update(presetId, { pattern: newPattern || undefined });
+      this.sessionManager.resetSession(chatId);
+
+      const successMessage = newPattern 
+        ? `✅ Узор обновлен на: <b>${newPattern}</b>`
+        : `✅ Узор удален`;
+      await this.bot.sendMessage(chatId, successMessage, {
+        parse_mode: 'HTML',
+        reply_markup: mainMenu
+      });
+    } catch (error) {
+      console.error('Error updating pattern:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Не удалось обновить узор'));
+    }
+  }
+
+  // Обработчик поиска пресетов
+  private async handleSearchInput(chatId: number, text: string): Promise<void> {
+    try {
+      const presets = await this.presetModel.findByCriteria({ gift_name: text.trim() });
+      const displayData = presets.map(preset => this.convertToPresetDisplayData(preset));
+
+      if (presets.length === 0) {
+        await this.bot.sendMessage(chatId, 
+          `🔍 По запросу "<b>${text.trim()}</b>" ничего не найдено.\n\n` +
+          `Попробуйте изменить поисковый запрос.`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: mainMenu
+          }
+        );
+        return;
+      }
+
+      const message = MessageFormatter.formatPresetsList(displayData, 0, 5, `Результаты поиска: "${text.trim()}"`);
+      const keyboard = presetsListKeyboard(displayData, 0, 5);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+      });
+
+      this.sessionManager.resetSession(chatId);
+    } catch (error) {
+      console.error('Error searching presets:', error);
+      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Ошибка при поиске пресетов'));
+    }
   }
 
   // Обработчик неизвестной команды

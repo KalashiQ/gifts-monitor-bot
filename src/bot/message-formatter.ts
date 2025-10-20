@@ -68,9 +68,10 @@ ${preset.pattern ? `🎨 Узор: ${preset.pattern}` : '🎨 Узор: не у�
   }
 
   // Форматирование списка пресетов
-  public static formatPresetsList(presets: PresetDisplayData[], page: number = 0, pageSize: number = 5): string {
+  public static formatPresetsList(presets: PresetDisplayData[], page: number = 0, pageSize: number = 5, title?: string): string {
     if (presets.length === 0) {
-      return `📋 <b>Мои пресеты</b>
+      const header = title || 'Мои пресеты';
+      return `📋 <b>${header}</b>
 
 ❌ У вас пока нет пресетов.
 
@@ -82,7 +83,8 @@ ${preset.pattern ? `🎨 Узор: ${preset.pattern}` : '🎨 Узор: не у�
     const endIndex = startIndex + pageSize;
     const pagePresets = presets.slice(startIndex, endIndex);
 
-    let message = `📋 <b>Мои пресеты</b>\n`;
+    const header = title || 'Мои пресеты';
+    let message = `📋 <b>${header}</b>\n`;
     message += `Страница ${page + 1} из ${totalPages}\n\n`;
 
     pagePresets.forEach((preset, index) => {

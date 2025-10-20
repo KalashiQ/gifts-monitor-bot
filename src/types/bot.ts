@@ -5,8 +5,13 @@ export enum UserState {
   ADDING_PRESET_BACKGROUND = 'adding_preset_background',
   ADDING_PRESET_PATTERN = 'adding_preset_pattern',
   EDITING_PRESET = 'editing_preset',
+  EDITING_PRESET_GIFT = 'editing_preset_gift',
+  EDITING_PRESET_MODEL = 'editing_preset_model',
+  EDITING_PRESET_BACKGROUND = 'editing_preset_background',
+  EDITING_PRESET_PATTERN = 'editing_preset_pattern',
   VIEWING_PRESETS = 'viewing_presets',
-  SETTINGS = 'settings'
+  SETTINGS = 'settings',
+  SEARCHING_PRESETS = 'searching_presets'
 }
 
 export interface UserSession {

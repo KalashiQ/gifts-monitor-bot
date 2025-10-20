@@ -10,10 +10,13 @@ export const mainMenu: ReplyKeyboardMarkup = {
     ],
     [
       { text: '🔍 Проверить сейчас' },
-      { text: '📊 Статистика' }
+      { text: '🔎 Поиск пресетов' }
     ],
     [
-      { text: '⚙️ Настройки' },
+      { text: '📊 Статистика' },
+      { text: '⚙️ Настройки' }
+    ],
+    [
       { text: 'ℹ️ Помощь' }
     ]
   ],
@@ -197,6 +200,53 @@ export const checkResultsKeyboard = (presetId: number): InlineKeyboardMarkup => 
     ],
     [
       { text: '⬅️ Назад', callback_data: JSON.stringify({ action: 'back_to_presets' }) }
+    ]
+  ]
+});
+
+// Inline клавиатура для поиска и фильтрации пресетов
+export const searchAndFilterKeyboard: InlineKeyboardMarkup = ({
+  inline_keyboard: [
+    [
+      { text: '🔍 Поиск по названию', callback_data: JSON.stringify({ action: 'search_presets' }) }
+    ],
+    [
+      { text: '🟢 Активные', callback_data: JSON.stringify({ action: 'filter_active' }) },
+      { text: '🔴 Неактивные', callback_data: JSON.stringify({ action: 'filter_inactive' }) },
+      { text: '📋 Все', callback_data: JSON.stringify({ action: 'filter_all' }) }
+    ],
+    [
+      { text: '⬅️ Назад в меню', callback_data: JSON.stringify({ action: 'back_to_menu' }) }
+    ]
+  ]
+});
+
+// Inline клавиатура для расширенного редактирования пресета
+export const advancedEditPresetKeyboard = (presetId: number): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [
+      { text: '🎁 Изменить подарок', callback_data: JSON.stringify({ action: 'edit_gift', presetId }) },
+      { text: '🎭 Изменить модель', callback_data: JSON.stringify({ action: 'edit_model', presetId }) }
+    ],
+    [
+      { text: '🖼️ Изменить фон', callback_data: JSON.stringify({ action: 'edit_background', presetId }) },
+      { text: '🎨 Изменить узор', callback_data: JSON.stringify({ action: 'edit_pattern', presetId }) }
+    ],
+    [
+      { text: '🔄 Обновить все', callback_data: JSON.stringify({ action: 'edit_all_fields', presetId }) }
+    ],
+    [
+      { text: '⬅️ Назад', callback_data: JSON.stringify({ action: 'back_to_presets' }) }
+    ]
+  ]
+});
+
+// Inline клавиатура для подтверждения изменений
+export const confirmEditKeyboard = (presetId: number): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [
+      { text: '✅ Сохранить изменения', callback_data: JSON.stringify({ action: 'save_edit', presetId }) },
+      { text: '❌ Отмена', callback_data: JSON.stringify({ action: 'cancel_edit', presetId }) }
     ]
   ]
 });
