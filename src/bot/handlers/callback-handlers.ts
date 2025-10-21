@@ -13,7 +13,6 @@ import {
   confirmDeleteKeyboard,
   checkResultsKeyboard,
   monitoringKeyboard,
-  monitoringSettingsKeyboard,
   parseCallbackData 
 } from '../keyboards';
 import { mainMenu } from '../keyboards';
@@ -107,24 +106,6 @@ export class CallbackHandlers {
         break;
       case 'stop_monitoring':
         await this.handleStopMonitoring(chatId, messageId, query);
-        break;
-      case 'manual_check':
-        await this.handleManualCheck(chatId, messageId, query);
-        break;
-      case 'monitoring_stats':
-        await this.handleMonitoringStats(chatId, messageId);
-        break;
-      case 'monitoring_settings':
-        await this.handleMonitoringSettings(chatId, messageId);
-        break;
-      case 'set_interval':
-        await this.handleSetInterval(chatId, messageId, data.interval, query);
-        break;
-      case 'set_24_7':
-        await this.handleSet24_7(chatId, messageId, query);
-        break;
-      case 'back_to_monitoring':
-        await this.handleBackToMonitoring(chatId, messageId);
         break;
       case 'back_to_presets':
         await this.handleBackToPresets(chatId, messageId);
@@ -395,8 +376,8 @@ export class CallbackHandlers {
       const presets = await this.presetModel.getByUserId(chatId);
       const displayData = presets.map(preset => this.convertToPresetDisplayData(preset));
 
-      const message = MessageFormatter.formatPresetsList(displayData);
-      const keyboard = presetsListKeyboard(displayData);
+      const message = MessageFormatter.formatPresetsList(displayData, 0, 5);
+      const keyboard = presetsListKeyboard(displayData, 0, 5);
 
       await this.bot.editMessageText(message, {
         chat_id: chatId,
@@ -422,8 +403,8 @@ export class CallbackHandlers {
       const presets = await this.presetModel.getByUserId(chatId);
       const displayData = presets.map(preset => this.convertToPresetDisplayData(preset));
 
-      const message = MessageFormatter.formatPresetsList(displayData, page);
-      const keyboard = presetsListKeyboard(displayData, page);
+      const message = MessageFormatter.formatPresetsList(displayData, page, 5);
+      const keyboard = presetsListKeyboard(displayData, page, 5);
 
       await this.bot.editMessageText(message, {
         chat_id: chatId,
@@ -442,8 +423,8 @@ export class CallbackHandlers {
       const presets = await this.presetModel.getByUserId(chatId);
       const displayData = presets.map(preset => this.convertToPresetDisplayData(preset));
 
-      const message = MessageFormatter.formatPresetsList(displayData, page);
-      const keyboard = presetsListKeyboard(displayData, page);
+      const message = MessageFormatter.formatPresetsList(displayData, page, 5);
+      const keyboard = presetsListKeyboard(displayData, page, 5);
 
       await this.bot.editMessageText(message, {
         chat_id: chatId,
@@ -690,181 +671,4 @@ export class CallbackHandlers {
     }
   }
 
-  private async handleManualCheck(chatId: number, messageId: number, query: TelegramBot.CallbackQuery): Promise<void> {
-    if (!this.monitoringService) {
-      await this.bot.answerCallbackQuery(query.id, { text: '❌ Сервис мониторинга недоступен' });
-      return;
-    }
-
-    try {
-      await this.bot.answerCallbackQuery(query.id, { text: '🔄 Запуск ручной проверки...' });
-      
-      const message = `🔄 *Ручная проверка*\n\n` +
-                     `Проверяем все активные пресеты...\n` +
-                     `Это может занять несколько минут.`;
-
-      await this.bot.editMessageText(message, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: 'HTML'
-      });
-
-      await this.monitoringService.performMonitoringCycle();
-      
-      const stats = this.monitoringService.getStats();
-      const resultMessage = `✅ *Ручная проверка завершена*\n\n` +
-                           `📊 *Статус:* ${stats.isRunning ? '🟢 Активен' : '🔴 Остановлен'}\n` +
-                           `📈 *Всего проверок:* ${stats.totalChecks}\n` +
-                           `✅ *Успешных:* ${stats.successfulChecks}\n` +
-                           `❌ *Неудачных:* ${stats.failedChecks}\n` +
-                           `🎯 *Обнаружено изменений:* ${stats.totalChanges}\n` +
-                           `⏰ *Последняя проверка:* ${stats.lastCheck ? stats.lastCheck.toLocaleString('ru-RU') : 'Никогда'}`;
-
-      await this.bot.editMessageText(resultMessage, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: 'HTML',
-        reply_markup: monitoringKeyboard
-      });
-    } catch (error) {
-      console.error('Error performing manual check:', error);
-      await this.bot.answerCallbackQuery(query.id, { text: '❌ Ошибка ручной проверки' });
-    }
-  }
-
-  private async handleMonitoringStats(chatId: number, messageId: number): Promise<void> {
-    if (!this.monitoringService) {
-      await this.bot.editMessageText('❌ Сервис мониторинга недоступен', {
-        chat_id: chatId,
-        message_id: messageId
-      });
-      return;
-    }
-
-    try {
-      const stats = this.monitoringService.getStats();
-      const message = MessageFormatter.formatMonitoringStats(stats);
-
-      // Сохраняем ID сообщения для автоматического обновления
-      this.monitoringService.setStatsMessageId(chatId, messageId);
-
-      await this.bot.editMessageText(message, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: 'HTML',
-        reply_markup: monitoringKeyboard
-      });
-    } catch (error) {
-      console.error('Error showing monitoring stats:', error);
-    }
-  }
-
-  private async handleMonitoringSettings(chatId: number, messageId: number): Promise<void> {
-    const message = `⚙️ *Настройки мониторинга*\n\n` +
-                   `Выберите интервал проверки:\n\n` +
-                   `⏰ *Каждую минуту* - максимальная частота\n` +
-                   `⏰ *Каждые 5 минут* - оптимальная частота\n` +
-                   `⏰ *Каждые 15 минут* - экономичная частота\n` +
-                   `⏰ *Каждый час* - минимальная частота\n` +
-                   `🔄 *Круглосуточный* - каждую минуту 24/7`;
-
-    await this.bot.editMessageText(message, {
-      chat_id: chatId,
-      message_id: messageId,
-      parse_mode: 'HTML',
-      reply_markup: monitoringSettingsKeyboard
-    });
-  }
-
-  private async handleSetInterval(chatId: number, messageId: number, interval: string, query: TelegramBot.CallbackQuery): Promise<void> {
-    if (!this.monitoringService) {
-      await this.bot.answerCallbackQuery(query.id, { text: '❌ Сервис мониторинга недоступен' });
-      return;
-    }
-
-    try {
-      const cronExpression = `*/${interval} * * * *`;
-      this.monitoringService.updateConfig({ cronExpression });
-      
-      await this.bot.answerCallbackQuery(query.id, { text: `✅ Интервал установлен: каждые ${interval} минут` });
-      
-      const message = `⚙️ *Настройки мониторинга*\n\n` +
-                     `✅ *Интервал установлен:* каждые ${interval} минут\n` +
-                     `🕐 *Cron выражение:* \`${cronExpression}\`\n\n` +
-                     `Мониторинг будет проверять ваши пресеты с выбранной частотой.`;
-
-      await this.bot.editMessageText(message, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: 'HTML',
-        reply_markup: monitoringSettingsKeyboard
-      });
-    } catch (error) {
-      console.error('Error setting interval:', error);
-      await this.bot.answerCallbackQuery(query.id, { text: '❌ Ошибка установки интервала' });
-    }
-  }
-
-  private async handleSet24_7(chatId: number, messageId: number, query: TelegramBot.CallbackQuery): Promise<void> {
-    if (!this.monitoringService) {
-      await this.bot.answerCallbackQuery(query.id, { text: '❌ Сервис мониторинга недоступен' });
-      return;
-    }
-
-    try {
-      const cronExpression = '*/1 * * * *'; // Каждую минуту
-      this.monitoringService.updateConfig({ cronExpression });
-      
-      await this.bot.answerCallbackQuery(query.id, { text: '✅ Круглосуточный мониторинг активирован' });
-      
-      const message = `🔄 *Круглосуточный мониторинг*\n\n` +
-                     `✅ *Режим:* 24/7 (каждую минуту)\n` +
-                     `🕐 *Cron выражение:* \`${cronExpression}\`\n\n` +
-                     `Мониторинг будет работать круглосуточно и проверять ваши пресеты каждую минуту.`;
-
-      await this.bot.editMessageText(message, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: 'HTML',
-        reply_markup: monitoringSettingsKeyboard
-      });
-    } catch (error) {
-      console.error('Error setting 24/7 monitoring:', error);
-      await this.bot.answerCallbackQuery(query.id, { text: '❌ Ошибка активации круглосуточного мониторинга' });
-    }
-  }
-
-  private async handleBackToMonitoring(chatId: number, messageId: number): Promise<void> {
-    if (!this.monitoringService) {
-      await this.bot.editMessageText('❌ Сервис мониторинга недоступен', {
-        chat_id: chatId,
-        message_id: messageId
-      });
-      return;
-    }
-
-    try {
-      const stats = this.monitoringService.getStats();
-      const message = `🔄 *Управление мониторингом*\n\n` +
-                     `📊 *Статус:* ${stats.isRunning ? '🟢 Активен' : '🔴 Остановлен'}\n` +
-                     `📈 *Всего проверок:* ${stats.totalChecks}\n` +
-                     `✅ *Успешных:* ${stats.successfulChecks}\n` +
-                     `❌ *Неудачных:* ${stats.failedChecks}\n` +
-                     `🎯 *Обнаружено изменений:* ${stats.totalChanges}\n` +
-                     `⏰ *Последняя проверка:* ${stats.lastCheck ? stats.lastCheck.toLocaleString('ru-RU') : 'Никогда'}\n\n` +
-                     `Выберите действие:`;
-
-      // Сохраняем ID сообщения для автоматического обновления
-      this.monitoringService.setStatsMessageId(chatId, messageId);
-
-      await this.bot.editMessageText(message, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: 'HTML',
-        reply_markup: monitoringKeyboard
-      });
-    } catch (error) {
-      console.error('Error showing monitoring menu:', error);
-    }
-  }
 }

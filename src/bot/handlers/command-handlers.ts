@@ -106,6 +106,15 @@ export class CommandHandlers {
     const text = msg.text || '';
     const session = this.sessionManager.getSession(chatId);
 
+    // Обработка кнопки "Отмена" - сбрасываем сессию и возвращаемся в главное меню
+    if (text === '❌ Отмена') {
+      this.sessionManager.resetSession(chatId);
+      await this.bot.sendMessage(chatId, '❌ Операция отменена. Возвращаемся в главное меню.', {
+        reply_markup: mainMenu
+      });
+      return;
+    }
+
     // Проверяем на команды главного меню
     if (text === '🎁 Добавить пресет') {
       await this.handleAddPreset(chatId);
@@ -117,10 +126,6 @@ export class CommandHandlers {
       return;
     }
 
-    if (text === '🔎 Поиск пресетов') {
-      await this.handleSearchPresets(chatId);
-      return;
-    }
 
     if (text === '🔄 Мониторинг') {
       await this.handleMonitoringButton(msg);
@@ -313,19 +318,12 @@ export class CommandHandlers {
       const presets = await this.presetModel.getByUserId(chatId);
       const displayData = presets.map(preset => this.convertToPresetDisplayData(preset));
 
-      const message = MessageFormatter.formatPresetsList(displayData);
-      const keyboard = presets.length > 0 
-        ? { inline_keyboard: presets.slice(0, 5).map(preset => [
-            {
-              text: `${preset.is_active ? '🟢' : '🔴'} ${preset.gift_name}`,
-              callback_data: JSON.stringify({ action: 'view_preset', presetId: preset.id })
-            }
-          ]) }
-        : undefined;
+      const message = MessageFormatter.formatPresetsList(displayData, 0, 5);
+      const keyboard = presetsListKeyboard(displayData, 0, 5);
 
       await this.bot.sendMessage(chatId, message, {
         parse_mode: 'HTML',
-        reply_markup: keyboard || mainMenu
+        reply_markup: keyboard
       });
     } catch (error) {
       console.error('Error getting presets:', error);
@@ -334,24 +332,6 @@ export class CommandHandlers {
   }
 
 
-  // Обработчик поиска пресетов
-  private async handleSearchPresets(chatId: number): Promise<void> {
-    try {
-      const presets = await this.presetModel.getByUserId(chatId);
-      const displayData = presets.map(preset => this.convertToPresetDisplayData(preset));
-
-      const message = MessageFormatter.formatPresetsList(displayData, 0, 5, 'Поиск и фильтрация пресетов');
-      const keyboard = presetsListKeyboard(displayData, 0, 5);
-
-      await this.bot.sendMessage(chatId, message, {
-        parse_mode: 'HTML',
-        reply_markup: keyboard
-      });
-    } catch (error) {
-      console.error('Error showing search presets:', error);
-      await this.bot.sendMessage(chatId, MessageFormatter.formatError('Не удалось загрузить пресеты для поиска'));
-    }
-  }
 
 
   // Обработчик редактирования пресета

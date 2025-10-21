@@ -26,8 +26,9 @@ export class TelegramBotService {
     parserService: ParserService,
     monitoringService?: MonitoringService
   ) {
+    // Создаем бота с дополнительными опциями для стабильности
     this.bot = new TelegramBot(config.token, { 
-      polling: config.polling !== false 
+      polling: config.polling !== false
     });
     this.sessionManager = new SessionManager();
     this.presetModel = presetModel;
@@ -123,9 +124,29 @@ export class TelegramBotService {
     try {
       console.log('Starting Telegram bot...');
       
-      // Получаем информацию о боте
-      const botInfo = await this.bot.getMe();
-      console.log(`Bot started: @${botInfo.username} (${botInfo.first_name})`);
+      // Получаем информацию о боте с повторными попытками
+      let botInfo;
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (attempts < maxAttempts) {
+        try {
+          botInfo = await this.bot.getMe();
+          break;
+        } catch (error: any) {
+          attempts++;
+          console.warn(`Attempt ${attempts}/${maxAttempts} failed:`, error.message);
+          
+          if (attempts >= maxAttempts) {
+            throw new Error(`Failed to get bot info after ${maxAttempts} attempts. Last error: ${error.message}`);
+          }
+          
+          // Ждем перед следующей попыткой
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
+        }
+      }
+      
+      console.log(`Bot started: @${botInfo?.username} (${botInfo?.first_name})`);
 
       // Запускаем очистку неактивных сессий каждые 30 минут
       setInterval(() => {
@@ -134,8 +155,18 @@ export class TelegramBotService {
 
       this.isRunning = true;
       console.log('Bot is running and ready to receive messages');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to start bot:', error);
+      
+      // Дополнительная диагностика
+      if (error.code === 'EFATAL' || error.message?.includes('AggregateError')) {
+        console.error('Network connectivity issue detected. Please check:');
+        console.error('1. Internet connection');
+        console.error('2. Telegram API availability');
+        console.error('3. Firewall settings');
+        console.error('4. Proxy configuration (if any)');
+      }
+      
       throw error;
     }
   }

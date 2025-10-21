@@ -714,24 +714,58 @@ export class PeekTgParser {
       // Кликаем на последний подарок с принудительным кликом
       console.log('  🖱️ Кликаем на последний подарок...');
       
+      let clickSuccess = false;
       try {
         // Пробуем обычный клик
         await lastGiftCard.click({ timeout: 5000 });
+        clickSuccess = true;
+        console.log('  ✅ Обычный клик прошел успешно');
       } catch (clickError) {
         console.log('  ⚠️ Обычный клик не сработал, пробуем принудительный...');
-        // Принудительный клик через JavaScript
-        await page.evaluate((element) => {
-          if (element && element instanceof HTMLElement) {
-            element.click();
-          }
-        }, lastGiftCard);
+        try {
+          // Принудительный клик через JavaScript
+          await page.evaluate((element) => {
+            if (element && element instanceof HTMLElement) {
+              element.click();
+            }
+          }, lastGiftCard);
+          clickSuccess = true;
+          console.log('  ✅ Принудительный клик прошел успешно');
+        } catch (jsClickError) {
+          console.log('  ❌ Принудительный клик тоже не сработал');
+          throw new Error('Не удалось кликнуть на подарок');
+        }
+      }
+      
+      if (!clickSuccess) {
+        throw new Error('Не удалось кликнуть на подарок');
       }
       
       // Ждем загрузки страницы подарка
+      console.log('  ⏳ Ждем загрузки страницы подарка...');
       await page.waitForTimeout(3000);
       
-      // Ищем ссылку на Telegram
-      const telegramLink = await page.$('a[href*="t.me/nft/"]');
+      // Ищем ссылку на Telegram с несколькими селекторами
+      console.log('  🔍 Ищем ссылку на Telegram...');
+      const telegramSelectors = [
+        'a[href*="t.me/nft/"]',
+        'a[href*="t.me/"]',
+        'a[href*="telegram.me/"]',
+        'a[href*="tg://"]'
+      ];
+      
+      let telegramLink = null;
+      for (const selector of telegramSelectors) {
+        try {
+          telegramLink = await page.$(selector);
+          if (telegramLink) {
+            console.log(`  ✅ Найдена ссылка с селектором: ${selector}`);
+            break;
+          }
+        } catch (e) {
+          // Продолжаем с следующим селектором
+        }
+      }
       
       if (telegramLink) {
         const href = await telegramLink.getAttribute('href');

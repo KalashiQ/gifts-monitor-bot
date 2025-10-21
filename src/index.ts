@@ -110,10 +110,28 @@ async function main() {
       token: botToken,
       polling: true
     };
+    
+    // Проверяем доступность Telegram API перед запуском
+    console.log('🔍 Testing Telegram API connectivity...');
+    try {
+      const testResponse = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+      if (!testResponse.ok) {
+        throw new Error(`Telegram API test failed: ${testResponse.status} ${testResponse.statusText}`);
+      }
+      const testData = await testResponse.json();
+      if (!testData.ok) {
+        throw new Error(`Telegram API error: ${testData.description}`);
+      }
+      console.log('✅ Telegram API is accessible');
+    } catch (error) {
+      console.error('❌ Telegram API test failed:', error);
+      console.error('This might indicate network connectivity issues.');
+      throw error;
+    }
 
     // Создаем конфигурацию мониторинга
     const monitoringConfig: MonitoringConfig = {
-      enabled: process.env.MONITORING_ENABLED !== 'false', // По умолчанию включен
+      enabled: process.env.MONITORING_ENABLED === 'true', // По умолчанию выключен
       cronExpression: process.env.MONITORING_CRON || '*/1 * * * *', // Каждую минуту
       checkIntervalMinutes: parseInt(process.env.MONITORING_INTERVAL || '1'),
       retryAttempts: parseInt(process.env.MONITORING_RETRY_ATTEMPTS || '3'),
@@ -123,6 +141,27 @@ async function main() {
     // Инициализируем бота
     console.log('🤖 Initializing Telegram bot...');
     const bot = new TelegramBotService(botConfig, presetModel, parserService);
+    
+    // Добавляем дополнительную обработку ошибок для бота
+    process.on('unhandledRejection', (reason, promise) => {
+      if (reason && typeof reason === 'object' && 'code' in reason && reason.code === 'EFATAL') {
+        console.error('❌ Fatal network error detected. This might be due to:');
+        console.error('   - Network connectivity issues');
+        console.error('   - Telegram API temporary unavailability');
+        console.error('   - Firewall blocking requests');
+        console.error('   - DNS resolution problems');
+        console.error('   - Proxy configuration issues');
+        console.error('   - Rate limiting by Telegram');
+        console.error('');
+        console.error('💡 Try the following solutions:');
+        console.error('   1. Check your internet connection');
+        console.error('   2. Wait a few minutes and try again');
+        console.error('   3. Check if Telegram API is accessible: https://api.telegram.org');
+        console.error('   4. Verify your bot token is correct');
+        console.error('   5. Check firewall/proxy settings');
+      }
+      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    });
 
     // Выводим информацию о контроле доступа
     console.log('🔐 Access control status:');

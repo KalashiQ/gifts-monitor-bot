@@ -9,7 +9,6 @@ export const mainMenu: ReplyKeyboardMarkup = {
       { text: '📋 Мои пресеты' }
     ],
     [
-      { text: '🔎 Поиск пресетов' },
       { text: '🔄 Мониторинг' }
     ],
     [
@@ -63,28 +62,22 @@ export const confirmKeyboard: ReplyKeyboardMarkup = {
 };
 
 // Inline клавиатура для действий с пресетом
-export const presetActions = (presetId: number, isActive: boolean): InlineKeyboardMarkup => ({
+export const presetActions = (presetId: number, _isActive: boolean): InlineKeyboardMarkup => ({
   inline_keyboard: [
     [
       { 
-        text: isActive ? '⏸️ Остановить мониторинг' : '▶️ Запустить мониторинг', 
-        callback_data: JSON.stringify({ action: 'toggle_preset', presetId })
-      }
-    ],
-    [
-      { 
-        text: '🔍 Проверить сейчас', 
-        callback_data: JSON.stringify({ action: 'check_preset', presetId })
-      },
-      { 
         text: '✏️ Редактировать', 
         callback_data: JSON.stringify({ action: 'edit_preset', presetId })
-      }
-    ],
-    [
+      },
       { 
         text: '🗑 Удалить', 
         callback_data: JSON.stringify({ action: 'delete_preset', presetId })
+      }
+    ],
+    [
+      { 
+        text: '⬅️ Назад к списку', 
+        callback_data: JSON.stringify({ action: 'back_to_presets' })
       }
     ]
   ]
@@ -134,11 +127,6 @@ export const presetsListKeyboard = (
   if (navigationButtons.length > 0) {
     keyboard.push(navigationButtons);
   }
-
-  // Кнопка назад
-  keyboard.push([
-    { text: '⬅️ Назад в меню', callback_data: JSON.stringify({ action: 'back_to_menu' }) }
-  ]);
 
   return { inline_keyboard: keyboard };
 };
@@ -253,13 +241,6 @@ export const monitoringKeyboard: InlineKeyboardMarkup = ({
     [
       { text: '🔄 Запустить мониторинг', callback_data: JSON.stringify({ action: 'start_monitoring' }) },
       { text: '⏹️ Остановить мониторинг', callback_data: JSON.stringify({ action: 'stop_monitoring' }) }
-    ],
-    [
-      { text: '🔍 Ручная проверка', callback_data: JSON.stringify({ action: 'manual_check' }) },
-      { text: '📊 Статистика', callback_data: JSON.stringify({ action: 'monitoring_stats' }) }
-    ],
-    [
-      { text: '⚙️ Настройки', callback_data: JSON.stringify({ action: 'monitoring_settings' }) }
     ],
     [
       { text: '⬅️ Назад в меню', callback_data: JSON.stringify({ action: 'back_to_menu' }) }

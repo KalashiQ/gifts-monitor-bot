@@ -31,6 +31,7 @@ export class MonitoringService {
   private stats: MonitoringStats;
   private isInitialized: boolean = false;
   private statsMessageIds: Map<number, number> = new Map(); // userId -> messageId
+  private lastStatsMessage: string = ''; // Кэш последнего сообщения
 
   constructor(
     database: Database,
@@ -253,14 +254,35 @@ export class MonitoringService {
       if (change.hasChanged) {
         try {
           console.log(`🔗 Получение ссылки на подарок для пресета "${preset.gift_name}"...`);
-          giftLink = await this.parserService.getLastGiftLink(preset);
+          
+          // Пытаемся получить ссылку с таймаутом
+          const linkPromise = this.parserService.getLastGiftLink(preset);
+          const timeoutPromise = new Promise<undefined>((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout getting gift link')), 30000)
+          );
+          
+          giftLink = await Promise.race([linkPromise, timeoutPromise]);
+          
           if (giftLink) {
             console.log(`✅ Ссылка получена: ${giftLink}`);
           } else {
             console.log(`⚠️ Ссылка не найдена для пресета "${preset.gift_name}"`);
           }
-        } catch (linkError) {
-          console.log(`⚠️ Ошибка получения ссылки на подарок: ${linkError}`);
+        } catch (linkError: any) {
+          console.log(`⚠️ Ошибка получения ссылки на подарок: ${linkError.message}`);
+          
+          // Если это TimeoutError или другая ошибка парсера, пытаемся альтернативный способ
+          if (linkError.message.includes('Timeout') || linkError.message.includes('TimeoutError')) {
+            console.log(`🔄 Попытка альтернативного получения ссылки...`);
+            try {
+              // Генерируем ссылку на поиск с параметрами
+              const searchUrl = this.generateSearchUrl(preset);
+              console.log(`🔗 Используем ссылку на поиск: ${searchUrl}`);
+              // Не устанавливаем giftLink, чтобы показать только ссылку на поиск
+            } catch (altError) {
+              console.log(`⚠️ Альтернативный способ тоже не сработал: ${altError}`);
+            }
+          }
           // Продолжаем без ссылки
         }
       }
@@ -360,15 +382,32 @@ export class MonitoringService {
     const stats = this.getStats();
     const message = MessageFormatter.formatMonitoringStats(stats);
 
+    // Проверяем, изменилось ли сообщение
+    if (message === this.lastStatsMessage) {
+      return; // Сообщение не изменилось, не обновляем
+    }
+
+    this.lastStatsMessage = message;
+
     for (const [userId, messageId] of this.statsMessageIds) {
       try {
         await this.telegramBot.editMessageText(userId, messageId, message, {
           parse_mode: 'HTML'
         });
-      } catch (error) {
-        // Если сообщение не найдено или пользователь заблокировал бота, удаляем из списка
-        console.log(`⚠️ Не удалось обновить статистику для пользователя ${userId}, удаляем из списка`);
-        this.statsMessageIds.delete(userId);
+      } catch (error: any) {
+        // Обрабатываем разные типы ошибок
+        if (error.response?.body?.description?.includes('message is not modified')) {
+          // Сообщение не изменилось - это нормально, не логируем ошибку
+          continue;
+        } else if (error.response?.body?.error_code === 400) {
+          // Сообщение не найдено или другие ошибки 400
+          console.log(`⚠️ Не удалось обновить статистику для пользователя ${userId}, удаляем из списка`);
+          this.statsMessageIds.delete(userId);
+        } else {
+          // Другие ошибки
+          console.log(`⚠️ Ошибка обновления статистики для пользователя ${userId}: ${error.message}`);
+          this.statsMessageIds.delete(userId);
+        }
       }
     }
   }

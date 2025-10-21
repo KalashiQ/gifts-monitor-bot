@@ -192,7 +192,7 @@ interface MonitoringStats {
 ### Переменные окружения
 ```env
 # Мониторинг
-MONITORING_ENABLED=true
+MONITORING_ENABLED=false
 MONITORING_CRON=*/1 * * * *
 MONITORING_INTERVAL=1
 MONITORING_RETRY_ATTEMPTS=3
@@ -233,8 +233,11 @@ MONITORING_RETRY_DELAY=1000
 # Разработка с мониторингом
 MONITORING_ENABLED=true npm run bot:dev
 
-# Продакшн
+# Продакшн (мониторинг выключен по умолчанию)
 npm run build
+npm start
+
+# Продакшн с мониторингом
 MONITORING_ENABLED=true npm start
 
 # Пример мониторинга
