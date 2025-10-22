@@ -15,7 +15,10 @@ dotenv.config();
 
 // Функция для проверки и завершения дублирующих процессов
 async function checkAndKillDuplicateProcesses(): Promise<void> {
-  const pidFile = path.join(process.cwd(), 'bot.pid');
+  // Кладем PID рядом с БД, чтобы PM2 cwd не влиял
+  const rawDbPath = process.env.DATABASE_PATH || './data/gifts-monitor.db';
+  const resolvedDbPath = path.isAbsolute(rawDbPath) ? rawDbPath : path.resolve(process.cwd(), rawDbPath);
+  const pidFile = path.join(path.dirname(resolvedDbPath), 'bot.pid');
   
   try {
     // Проверяем, существует ли файл PID
@@ -60,7 +63,9 @@ async function checkAndKillDuplicateProcesses(): Promise<void> {
 
 // Функция для очистки файла PID при завершении
 function cleanupPidFile(): void {
-  const pidFile = path.join(process.cwd(), 'bot.pid');
+  const rawDbPath = process.env.DATABASE_PATH || './data/gifts-monitor.db';
+  const resolvedDbPath = path.isAbsolute(rawDbPath) ? rawDbPath : path.resolve(process.cwd(), rawDbPath);
+  const pidFile = path.join(path.dirname(resolvedDbPath), 'bot.pid');
   try {
     if (fs.existsSync(pidFile)) {
       fs.unlinkSync(pidFile);
@@ -91,9 +96,19 @@ async function main() {
 
     console.log(`🤖 Bot token: ${botToken.substring(0, 10)}...`);
 
-    // Инициализируем базу данных
+    // Инициализируем базу данных (абсолютный путь и гарантированная директория)
     console.log('📊 Initializing database...');
-    const database = new Database({ path: process.env.DATABASE_PATH || './data/gifts-monitor.db' });
+    const rawDbPath = process.env.DATABASE_PATH || './data/gifts-monitor.db';
+    const dbPath = path.isAbsolute(rawDbPath) ? rawDbPath : path.resolve(process.cwd(), rawDbPath);
+    const dbDir = path.dirname(dbPath);
+    try {
+      fs.mkdirSync(dbDir, { recursive: true });
+    } catch (e) {
+      console.error('❌ Failed to create database directory:', dbDir, e);
+      throw e;
+    }
+    console.log(`🗄️ Database path: ${dbPath}`);
+    const database = new Database({ path: dbPath });
     await database.initialize();
 
     // Создаем модели
